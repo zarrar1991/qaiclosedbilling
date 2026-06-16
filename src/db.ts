@@ -28,7 +28,10 @@ export async function lookupAccountId(pool: pg.Pool, email: string): Promise<str
   return res.rows.length ? String(res.rows[0].id) : null;
 }
 
-const SUB_COLUMNS = `id, "accountId", status, "renewalDateTime", "deletedAt", "stripeSubscriptionId", "stripeCustomerId", "createdAt"`;
+// Schema: icloseddevdb.subscriptions (resolved via search_path). The Stripe
+// subscription id is stored in the "subscriptionId" column (aliased below).
+// There is no stripeCustomerId column in this schema.
+const SUB_COLUMNS = `id, "accountId", status, "renewalDateTime", "deletedAt", "subscriptionId" AS "stripeSubscriptionId", "pauseCollection", "createdAt"`;
 
 function mapRow(r: Record<string, unknown>): SubscriptionRow {
   return {
@@ -38,28 +41,17 @@ function mapRow(r: Record<string, unknown>): SubscriptionRow {
     renewalDateTime: r.renewalDateTime === null ? null : String(r.renewalDateTime),
     deletedAt: r.deletedAt === null ? null : String(r.deletedAt),
     stripeSubscriptionId: r.stripeSubscriptionId == null ? null : String(r.stripeSubscriptionId),
-    stripeCustomerId: r.stripeCustomerId == null ? null : String(r.stripeCustomerId),
+    stripeCustomerId: null, // not present in this schema
+    pauseCollection: r.pauseCollection == null ? null : Boolean(r.pauseCollection),
     createdAt: r.createdAt === null ? null : String(r.createdAt),
   };
 }
 
 export async function fetchSubscriptions(pool: pg.Pool, accountId: string): Promise<SubscriptionRow[]> {
-  // stripeCustomerId may not exist in every schema; fall back if the column is missing.
-  const withCustomer = `SELECT ${SUB_COLUMNS} FROM "Subscriptions" WHERE "accountId" = $1 AND "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
-  logQuery(withCustomer, [accountId]);
-  try {
-    const res = await pool.query(withCustomer, [accountId]);
-    return res.rows.map(mapRow);
-  } catch (err) {
-    if (err instanceof Error && /stripeCustomerId/i.test(err.message)) {
-      const fallback = `SELECT id, "accountId", status, "renewalDateTime", "deletedAt", "stripeSubscriptionId", "createdAt" FROM "Subscriptions" WHERE "accountId" = $1 AND "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
-      console.log('Note: "stripeCustomerId" column not found; retrying without it.');
-      logQuery(fallback, [accountId]);
-      const res = await pool.query(fallback, [accountId]);
-      return res.rows.map((r) => mapRow({ ...r, stripeCustomerId: null }));
-    }
-    throw err;
-  }
+  const sql = `SELECT ${SUB_COLUMNS} FROM subscriptions WHERE "accountId" = $1 AND "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
+  logQuery(sql, [accountId]);
+  const res = await pool.query(sql, [accountId]);
+  return res.rows.map(mapRow);
 }
 
 // Transactional update. `target` is either a single id or "ALL" with accountId.
@@ -74,11 +66,11 @@ export async function updateRenewal(
     let sql: string;
     let params: unknown[];
     if (target.mode === "single") {
-      sql = `UPDATE "Subscriptions" SET "renewalDateTime" = $1 WHERE id = $2 RETURNING ${SUB_COLUMNS};`;
-      params = [newRenewal, target.id];
+      sql = `UPDATE subscriptions SET "renewalDateTime" = $1 WHERE id = $2 RETURNING ${SUB_COLUMNS};`;
+      params = [newRenewal, Number(target.id)];
     } else {
-      sql = `UPDATE "Subscriptions" SET "renewalDateTime" = $1 WHERE "accountId" = $2 AND "deletedAt" IS NULL RETURNING ${SUB_COLUMNS};`;
-      params = [newRenewal, target.accountId];
+      sql = `UPDATE subscriptions SET "renewalDateTime" = $1 WHERE "accountId" = $2 AND "deletedAt" IS NULL RETURNING ${SUB_COLUMNS};`;
+      params = [newRenewal, Number(target.accountId)];
     }
     logQuery(sql, params);
     const res = await client.query(sql, params);
@@ -96,8 +88,9 @@ export async function updateRenewal(
 // Re-select updated rows to confirm persisted values.
 export async function reselectByIds(pool: pg.Pool, ids: string[]): Promise<SubscriptionRow[]> {
   if (ids.length === 0) return [];
-  const sql = `SELECT ${SUB_COLUMNS} FROM "Subscriptions" WHERE id = ANY($1::text[]) ORDER BY "createdAt" DESC;`;
-  logQuery(sql, [ids]);
-  const res = await pool.query(sql, [ids]);
+  const sql = `SELECT ${SUB_COLUMNS} FROM subscriptions WHERE id = ANY($1::int[]) ORDER BY "createdAt" DESC;`;
+  const numericIds = ids.map(Number);
+  logQuery(sql, [numericIds]);
+  const res = await pool.query(sql, [numericIds]);
   return res.rows.map(mapRow);
 }

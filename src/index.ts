@@ -11,7 +11,7 @@ function printRows(rows: SubscriptionRow[]): void {
   console.table(
     rows.map((r) => ({
       id: r.id, status: r.status, renewalDateTime: r.renewalDateTime,
-      stripeSubscriptionId: r.stripeSubscriptionId, stripeCustomerId: r.stripeCustomerId, createdAt: r.createdAt,
+      pauseCollection: r.pauseCollection, stripeSubscriptionId: r.stripeSubscriptionId, createdAt: r.createdAt,
     })),
   );
 }

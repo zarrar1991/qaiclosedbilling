@@ -26,8 +26,9 @@ export interface SubscriptionRow {
   status: string | null;
   renewalDateTime: string | null;
   deletedAt: string | null;
-  stripeSubscriptionId: string | null;
-  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null; // mapped from the DB "subscriptionId" column
+  stripeCustomerId: string | null; // not stored in this schema; always null
+  pauseCollection: boolean | null;
   createdAt: string | null;
 }
 
