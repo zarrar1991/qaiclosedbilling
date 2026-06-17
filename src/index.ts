@@ -108,15 +108,17 @@ async function main(): Promise<void> {
     const result = await runStripeSimulation(
       cfg,
       { email, span, expectedStripeSubscriptionId: expectedSubId, expectedStripeCustomerId: expectedCusId },
-      async ({ targetIso }) => {
-        if (cfg.dryRun) {
-          console.log(`[DRY_RUN] Would advance clock toward ${targetIso}. Not advancing.`);
-          return false;
-        }
-        return promptTypeToken(
-          "ADVANCE",
-          `About to advance Stripe test clock:\n  email: ${email}\n  customer: ${expectedCusId ?? "-"}\n  paused sub: ${expectedSubId ?? "-"}\n  span: ${spanRaw}\n  target: ${targetIso}`,
-        );
+      {
+        confirmAdvance: async ({ targetIso }) => {
+          if (cfg.dryRun) {
+            console.log(`[DRY_RUN] Would advance clock toward ${targetIso}. Not advancing.`);
+            return false;
+          }
+          return promptTypeToken(
+            "ADVANCE",
+            `About to advance Stripe test clock:\n  email: ${email}\n  customer: ${expectedCusId ?? "-"}\n  paused sub: ${expectedSubId ?? "-"}\n  span: ${spanRaw}\n  target: ${targetIso}`,
+          );
+        },
       },
     );
 

@@ -21,6 +21,14 @@ export interface StripeFlowResult {
   notes: string[];
 }
 
+export interface StripeFlowHooks {
+  onStatus?: (step: string, message: string) => void;
+  // UI mode: resolve once the dashboard is ready (poll), instead of a terminal prompt.
+  waitForLogin?: (page: Page) => Promise<void>;
+  // UI mode: return true to advance (the UI button is the confirmation).
+  confirmAdvance?: (details: { targetIso: string }) => Promise<boolean>;
+}
+
 const ARTIFACTS = "artifacts";
 
 async function shot(page: Page, name: string): Promise<void> {
@@ -52,15 +60,19 @@ function accountSwitcher(page: Page): Locator {
   return page.getByRole("button", { name: /account options and switcher/i }).first();
 }
 
-async function ensureLoggedIn(page: Page, cfg: AppConfig): Promise<void> {
+async function ensureLoggedIn(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
   await page.goto(cfg.stripe.dashboardUrl, { waitUntil: "domcontentloaded" });
-  // If we land on the login/auth flow, pause for manual completion (incl. 2FA).
-  if (/\/login|\/signin|authenticate/i.test(page.url()) || (await accountSwitcher(page).count()) === 0) {
+  const needsLogin = /\/login|\/signin|authenticate/i.test(page.url()) || (await accountSwitcher(page).count()) === 0;
+  if (!needsLogin) return;
+  if (hooks.waitForLogin) {
+    hooks.onStatus?.("login", "Waiting for you to log into Stripe in the opened window…");
+    await hooks.waitForLogin(page);
+  } else {
     await promptEnterWhenReady(
       "Stripe login/2FA may be required. Complete login in the opened browser so the dashboard is visible,",
     );
-    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
   }
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 }
 
 // Step 3-4: ensure the configured environment is selected. If the env name is
@@ -304,25 +316,32 @@ export async function verifyActiveSubscriptionForEmail(
 export async function runStripeSimulation(
   cfg: AppConfig,
   input: StripeFlowInput,
-  confirmAdvance: (details: { targetIso: string }) => Promise<boolean>,
+  hooks: StripeFlowHooks = {},
 ): Promise<StripeFlowResult> {
+  const status = (step: string, message: string) => hooks.onStatus?.(step, message);
   const notes: string[] = [];
   const context = await launchStripeContext(cfg);
   const page = context.pages()[0] ?? (await context.newPage());
   try {
-    await ensureLoggedIn(page, cfg);
+    status("login", "Ensuring Stripe login…");
+    await ensureLoggedIn(page, cfg, hooks);
+    status("environment", "Ensuring correct environment is selected…");
     await ensureEnvironmentSelected(page, cfg);
+    status("testmode", "Ensuring Test mode is active…");
     await ensureTestMode(page);
 
+    status("customer", "Opening customer by email…");
     const stripeCustomerId = await openCustomerByEmail(page, cfg, input.email);
     if (input.expectedStripeCustomerId && stripeCustomerId &&
         input.expectedStripeCustomerId !== stripeCustomerId) {
       notes.push(`DB stripeCustomerId (${input.expectedStripeCustomerId}) != opened customer (${stripeCustomerId}).`);
     }
 
+    status("paused", "Waiting for Collection Paused indicator…");
     const collectionPausedSeen = await waitForCollectionPaused(page, cfg);
     if (!collectionPausedSeen) notes.push("Collection Paused tag was not observed.");
 
+    status("subscription", "Opening paused subscription…");
     const oldStripeSubscriptionId = await openPausedSubscription(page, cfg);
     if (input.expectedStripeSubscriptionId && oldStripeSubscriptionId &&
         input.expectedStripeSubscriptionId !== oldStripeSubscriptionId) {
@@ -333,7 +352,7 @@ export async function runStripeSimulation(
     }
 
     const targetIso = addSpan(new Date(), input.span).toISOString();
-    const proceed = await confirmAdvance({ targetIso });
+    const proceed = hooks.confirmAdvance ? await hooks.confirmAdvance({ targetIso }) : true;
     if (!proceed) {
       notes.push("User declined the ADVANCE confirmation; clock not advanced.");
       await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) }).catch(() => undefined);
@@ -347,8 +366,10 @@ export async function runStripeSimulation(
       };
     }
 
+    status("advancing", "Advancing Stripe test clock…");
     await advanceClockBySpan(page, cfg, input.span);
 
+    status("verifying", "Verifying active subscription after advance…");
     const verify = await verifyActiveSubscriptionForEmail(
       page,
       cfg,
@@ -361,6 +382,7 @@ export async function runStripeSimulation(
       notes.push("New active subscription id equals old paused id — may be the same subscription resumed.");
     }
 
+    status("done", "Stripe flow complete.");
     await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) }).catch(() => undefined);
     return {
       stripeCustomerId,
