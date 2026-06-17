@@ -26,8 +26,12 @@ function generatePassword(length = 12): string {
 
 type RunState = "idle" | "running" | "success" | "error";
 
+const CAMPAIGN_URL_KEY = "iclosed.campaignUrl";
+
 export function CreateUser() {
-  const [campaignUrl, setCampaignUrl] = useState("");
+  // Persist the campaign URL across runs/restarts so it isn't re-entered each time.
+  const [campaignUrl, setCampaignUrl] = useState(() => localStorage.getItem(CAMPAIGN_URL_KEY) ?? "");
+  useEffect(() => { localStorage.setItem(CAMPAIGN_URL_KEY, campaignUrl); }, [campaignUrl]);
   const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("Demo@123");
