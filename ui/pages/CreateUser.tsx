@@ -5,6 +5,7 @@ import { Banner } from "../components/Banner.js";
 import { Select } from "../components/Select.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
 import { SearchableSelect } from "../components/SearchableSelect.js";
+import { humanizeError } from "../lib/errors.js";
 import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
 import type { Campaign, CampaignLink } from "../../src/types.js";
 
@@ -65,7 +66,7 @@ export function CreateUser({ profile }: { profile: string }) {
     setLoadingCampaigns(true); setCampaignsError(null);
     const r = await api.listCampaigns(profile);
     setLoadingCampaigns(false);
-    if (!r.ok) { setCampaignsError(r.error); return; }
+    if (!r.ok) { setCampaignsError(humanizeError(r.error)); return; }
     setCampaigns(r.data);
     // Default-select the latest (first) campaign if nothing is chosen yet.
     if (!selectedCampaign && r.data.length > 0) onPickCampaign(String(r.data[0].id));
@@ -76,7 +77,7 @@ export function CreateUser({ profile }: { profile: string }) {
     setLoadingLinks(true); setLinksError(null);
     const r = await api.listCampaignLinks(profile, Number(campaignId));
     setLoadingLinks(false);
-    if (!r.ok) { setLinksError(r.error); setLinks([]); return; }
+    if (!r.ok) { setLinksError(humanizeError(r.error)); setLinks([]); return; }
     setLinks(r.data);
     // Default-select the first link and fill the URL (if none chosen / URL empty).
     if (r.data.length > 0 && !selectedLink) onPickLink(r.data[0].hash, !campaignUrl);
@@ -139,7 +140,7 @@ export function CreateUser({ profile }: { profile: string }) {
       headed: !headless,
       keepOpen: !closeWhenDone,
     });
-    if (!res.ok) { setError(res.error); setState("error"); return; }
+    if (!res.ok) { setError(humanizeError(res.error)); setState("error"); return; }
     setResult(res.data); setState("success");
   }
 

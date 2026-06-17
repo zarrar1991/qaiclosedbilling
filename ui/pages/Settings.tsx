@@ -4,6 +4,7 @@ import { Field } from "../components/Field.js";
 import { Select } from "../components/Select.js";
 import { useToast } from "../components/Toast.js";
 import { ConfirmDialog } from "../components/ConfirmDialog.js";
+import { humanizeError } from "../lib/errors.js";
 
 const DB_KEYS = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSSLMODE", "PGSCHEMA"];
 const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_AUTH_PROFILE_DIR",
@@ -27,7 +28,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
 
   async function refreshList(selectName?: string) {
     const r = await api.loadProfiles();
-    if (!r.ok) { toast("error", "Couldn't load profiles", r.error); return; }
+    if (!r.ok) { toast("error", "Couldn't load profiles", humanizeError(r.error)); return; }
     setNames(r.data.names);
     setActive(r.data.activeProfile);
     const pick = selectName ?? r.data.activeProfile;
@@ -49,13 +50,13 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     const r = await api.saveProfile(selected, vals);
     if (r.ok) { setNames(r.data.names); setActive(r.data.activeProfile); onProfilesChanged?.(); }
     if (r.ok) toast("success", "Settings saved", `Profile "${selected}" saved.`);
-    else toast("error", "Save failed", r.error);
+    else toast("error", "Save failed", humanizeError(r.error));
   }
 
   async function test() {
     const r = await api.testDb(selected);
     if (r.ok) toast("success", "Connection OK", `Connected to the database (${selected}).`);
-    else toast("error", "Connection failed", r.error);
+    else toast("error", "Connection failed", humanizeError(r.error));
   }
 
   async function createProfile(values: Record<string, string>, successText: (name: string) => string) {
@@ -63,7 +64,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     if (!name) { toast("error", "Name required", "Enter a profile name first."); return; }
     if (names.includes(name)) { toast("error", "Already exists", `Profile "${name}" already exists.`); return; }
     const r = await api.saveProfile(name, values);
-    if (!r.ok) { toast("error", "Couldn't create profile", r.error); return; }
+    if (!r.ok) { toast("error", "Couldn't create profile", humanizeError(r.error)); return; }
     setNewName("");
     await refreshList(name);
     onProfilesChanged?.();
@@ -87,7 +88,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     if (!to) { toast("error", "Name required", "Enter the new name in 'New profile name'."); return; }
     if (to !== selected && names.includes(to)) { toast("error", "Already exists", `Profile "${to}" already exists.`); return; }
     const r = await api.renameProfile(selected, to);
-    if (!r.ok) { toast("error", "Rename failed", r.error); return; }
+    if (!r.ok) { toast("error", "Rename failed", humanizeError(r.error)); return; }
     setNewName("");
     setNames(r.data.names); setActive(r.data.activeProfile);
     setSelected(to);
@@ -100,7 +101,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     setConfirmDelete(false);
     if (!selected) return;
     const r = await api.deleteProfile(selected);
-    if (!r.ok) { toast("error", "Delete failed", r.error); return; }
+    if (!r.ok) { toast("error", "Delete failed", humanizeError(r.error)); return; }
     setNames(r.data.names);
     setActive(r.data.activeProfile);
     const next = r.data.names[0] ?? "";
@@ -114,7 +115,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     if (!selected) return;
     const r = await api.setActiveProfile(selected);
     if (r.ok) { setActive(r.data.activeProfile); onProfilesChanged?.(); toast("info", "Default profile set", `"${selected}" is now the default profile.`); }
-    else toast("error", "Couldn't set default", r.error);
+    else toast("error", "Couldn't set default", humanizeError(r.error));
   }
 
   const section = (title: string, keys: string[], secretKey?: string) => (

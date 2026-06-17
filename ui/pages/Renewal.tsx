@@ -4,6 +4,7 @@ import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { SubscriptionPicker } from "../components/SubscriptionPicker.js";
 import { SubscriptionsTable } from "../components/SubscriptionsTable.js";
+import { humanizeError } from "../lib/errors.js";
 import type { SubscriptionRow } from "../../src/types.js";
 
 export function Renewal({ profile }: { profile: string }) {
@@ -23,7 +24,7 @@ export function Renewal({ profile }: { profile: string }) {
     setSearching(true); setSearchError(null);
     const res = await api.searchSubscriptions(profile, email);
     setSearching(false);
-    if (!res.ok) { setSearchError(res.error); setSearchRows(null); return; }
+    if (!res.ok) { setSearchError(humanizeError(res.error)); setSearchRows(null); return; }
     setSearchRows(res.data.rows);
   }
 
@@ -31,7 +32,7 @@ export function Renewal({ profile }: { profile: string }) {
     setResult(null); setRows(null); setBusy(true);
     const res = await api.getCandidates(profile, email);
     setBusy(false);
-    if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
+    if (!res.ok) { setResult({ ok: false, msg: humanizeError(res.error) }); return; }
     setAccountId(res.data.accountId);
     if (res.data.rows.length === 1) await doUpdate(res.data.rows[0].id, res.data.accountId);
     else setRows(res.data.rows);
@@ -43,7 +44,7 @@ export function Renewal({ profile }: { profile: string }) {
     setBusy(true); setRows(null);
     const res = await api.updateRenewal(profile, { id });
     setBusy(false);
-    if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
+    if (!res.ok) { setResult({ ok: false, msg: humanizeError(res.error) }); return; }
     const r = res.data.reselected[0];
     setResult({ ok: true, msg: `Account ${acct ?? accountId}, subscription ${r.id} → renewal ${r.renewalDateTime} (UTC).` });
     // Refresh the table so it reflects the update.

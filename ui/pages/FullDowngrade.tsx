@@ -4,6 +4,7 @@ import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { Select } from "../components/Select.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
+import { humanizeError } from "../lib/errors.js";
 import type { RunReport } from "../../src/types.js";
 
 const PRESETS = ["1 day", "1 week", "1 month", "1 year", "Custom"] as const;
@@ -30,7 +31,7 @@ export function FullDowngrade({ profile }: { profile: string }) {
     setSteps([]); setReport(null); setError(null); setBusy(true);
     const res = await api.runFullFlow(profile, { email, span: span() });
     setBusy(false);
-    if (!res.ok) { setError(res.error); return; }
+    if (!res.ok) { setError(humanizeError(res.error)); return; }
     setReport(res.data);
   }
 
