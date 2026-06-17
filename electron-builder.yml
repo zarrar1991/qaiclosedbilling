@@ -10,6 +10,10 @@ extraResources:
     to: "ms-playwright"
 asarUnpack:
   - "**/*.node"
+  # iClosed engine + Playwright must be real files on disk (not inside the asar).
+  - "dist-electron/electron/iclosed-flow.cjs"
+  - "node_modules/playwright/**"
+  - "node_modules/playwright-core/**"
 win:
   target: nsis
 mac:

@@ -15,6 +15,9 @@ const CH = {
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",
+  iclosedCreate: "iclosed:create",
+  iclosedProgress: "iclosed:progress",
+  openExternal: "shell:openExternal",
 };
 
 contextBridge.exposeInMainWorld("api", {
@@ -35,4 +38,12 @@ contextBridge.exposeInMainWorld("api", {
     ipcRenderer.on(CH.fullflowProgress, listener);
     return () => ipcRenderer.removeListener(CH.fullflowProgress, listener);
   },
+  // Create iClosed user
+  createIClosedUser: (req) => ipcRenderer.invoke(CH.iclosedCreate, req),
+  onIClosedProgress: (cb) => {
+    const listener = (_e, p) => cb(p);
+    ipcRenderer.on(CH.iclosedProgress, listener);
+    return () => ipcRenderer.removeListener(CH.iclosedProgress, listener);
+  },
+  openExternal: (url) => ipcRenderer.invoke(CH.openExternal, url),
 });

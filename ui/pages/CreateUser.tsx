@@ -1,0 +1,166 @@
+import React, { useEffect, useState } from "react";
+import { api } from "../lib/api.js";
+import { Field } from "../components/Field.js";
+import { Banner } from "../components/Banner.js";
+import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
+import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
+
+// Ported from the module's renderer.js generatePassword: 12 chars, >=1 of each
+// class, shuffled (Fisher–Yates).
+function generatePassword(length = 12): string {
+  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+  const lower = "abcdefghijkmnopqrstuvwxyz";
+  const digits = "23456789";
+  const special = "!@#$%&*?";
+  const all = upper + lower + digits + special;
+  const rand = (set: string) => set[Math.floor(Math.random() * set.length)];
+  const required = [rand(upper), rand(lower), rand(digits), rand(special)];
+  const rest = Array.from({ length: length - required.length }, () => rand(all));
+  const chars = [...required, ...rest];
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join("");
+}
+
+type RunState = "idle" | "running" | "success" | "error";
+
+export function CreateUser() {
+  const [campaignUrl, setCampaignUrl] = useState("");
+  const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("Demo@123");
+  const [headless, setHeadless] = useState(true);
+  const [closeWhenDone, setCloseWhenDone] = useState(false);
+
+  const [state, setState] = useState<RunState>("idle");
+  const [steps, setSteps] = useState<Step[]>([]);
+  const [result, setResult] = useState<IClosedResult | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  useEffect(
+    () =>
+      api.onIClosedProgress((p: IClosedProgress) => {
+        if (p.step?.startsWith("DBG")) return; // skip debug dumps
+        setSteps((s) => [...s, { step: p.step, message: p.detail ?? (p.error ? p.error : "") }]);
+      }),
+    [],
+  );
+
+  const running = state === "running";
+  const canRun = !running && campaignUrl.trim() !== "" && password.trim() !== "" && (emailMode === "random" || email.trim() !== "");
+
+  async function run() {
+    setState("running"); setSteps([]); setResult(null); setError(null);
+    const res = await api.createIClosedUser({
+      campaignUrl: campaignUrl.trim(),
+      emailMode,
+      email: emailMode === "custom" ? email.trim() : undefined,
+      password,
+      headed: !headless,
+      keepOpen: !closeWhenDone,
+    });
+    if (!res.ok) { setError(res.error); setState("error"); return; }
+    setResult(res.data); setState("success");
+  }
+
+  async function copy(label: string, value: string) {
+    await navigator.clipboard.writeText(value).catch(() => undefined);
+    setCopied(label); setTimeout(() => setCopied(null), 1200);
+  }
+
+  return (
+    <div className="max-w-2xl space-y-5">
+      <h1 className="text-2xl font-bold">Create iClosed user</h1>
+      <p className="text-sm text-slate-400">
+        Automates signup → Stripe (test card 4242…) → onboarding on dev.iclosed.io. Requires Google Chrome installed.
+      </p>
+
+      <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
+        placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />
+
+      <div className="space-y-2">
+        <span className="block text-sm text-slate-400">Email</span>
+        <div className="flex items-center gap-4 text-sm">
+          <label className="flex items-center gap-2">
+            <input type="radio" checked={emailMode === "random"} onChange={() => setEmailMode("random")} disabled={running} />
+            Random
+          </label>
+          <label className="flex items-center gap-2">
+            <input type="radio" checked={emailMode === "custom"} onChange={() => setEmailMode("custom")} disabled={running} />
+            User-Defined
+          </label>
+        </div>
+        {emailMode === "custom" && (
+          <Field label="" value={email} onChange={setEmail} placeholder="user@example.com" />
+        )}
+      </div>
+
+      <div className="flex items-end gap-2">
+        <div className="flex-1"><Field label="Password" value={password} onChange={setPassword} /></div>
+        <button onClick={() => setPassword(generatePassword())} disabled={running}
+          className="rounded-lg border border-slate-700 px-3 py-2 text-slate-300 hover:bg-slate-800 disabled:opacity-50">
+          Regenerate
+        </button>
+      </div>
+
+      <div className="flex flex-wrap items-end gap-4">
+        <label className="block">
+          <span className="mb-1 block text-sm text-slate-400">Browser mode</span>
+          <select value={headless ? "headless" : "headed"} onChange={(e) => setHeadless(e.target.value === "headless")} disabled={running}
+            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+            <option value="headless">Headless</option>
+            <option value="headed">Headed</option>
+          </select>
+        </label>
+        <label className="flex items-center gap-2 pb-2 text-sm text-slate-300">
+          <input type="checkbox" checked={closeWhenDone} onChange={(e) => setCloseWhenDone(e.target.checked)} disabled={running} />
+          Close browser when done
+        </label>
+      </div>
+
+      <button disabled={!canRun} onClick={run}
+        className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
+        {running ? "Creating…" : "Create"}
+      </button>
+
+      {steps.length > 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+          <StatusTimeline steps={steps} done={state === "success"} failed={state === "error"} />
+        </div>
+      )}
+
+      {error && <Banner kind="error" title="Create failed">{error}</Banner>}
+
+      {result && (
+        <Banner kind="success" title="User created">
+          <div className="mt-1 space-y-1">
+            {([
+              ["Email", result.email],
+              ["Password", result.password],
+              ["Username", result.username],
+            ] as const).map(([label, value]) => (
+              <div key={label} className="flex items-center gap-2">
+                <span className="w-24 text-slate-400">{label}</span>
+                <span className="font-mono text-slate-100">{value}</span>
+                <button onClick={() => copy(label, value)} className="text-xs text-sky-300 hover:underline">
+                  {copied === label ? "copied" : "copy"}
+                </button>
+              </div>
+            ))}
+            <div className="flex items-center gap-2">
+              <span className="w-24 text-slate-400">Workspace</span>
+              <a href="#" onClick={(e) => { e.preventDefault(); api.openExternal(result.workspaceUrl); }}
+                className="font-mono text-sky-300 hover:underline">{result.workspaceUrl}</a>
+              <button onClick={() => copy("Workspace", result.workspaceUrl)} className="text-xs text-sky-300 hover:underline">
+                {copied === "Workspace" ? "copied" : "copy"}
+              </button>
+            </div>
+          </div>
+        </Banner>
+      )}
+    </div>
+  );
+}

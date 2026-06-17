@@ -1,9 +1,10 @@
 import React from "react";
-export type Page = "renewal" | "full" | "settings";
+export type Page = "renewal" | "full" | "createuser" | "settings";
 export function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   const items: { id: Page; label: string }[] = [
     { id: "renewal", label: "Renewal Date Updater" },
     { id: "full", label: "Full downgrade" },
+    { id: "createuser", label: "Create iClosed user" },
     { id: "settings", label: "Settings" },
   ];
   return (

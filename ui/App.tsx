@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { Sidebar, type Page } from "./components/Sidebar.js";
 import { Renewal } from "./pages/Renewal.js";
 import { FullDowngrade } from "./pages/FullDowngrade.js";
+import { CreateUser } from "./pages/CreateUser.js";
 import { Settings } from "./pages/Settings.js";
 import { api } from "./lib/api.js";
 
@@ -40,6 +41,7 @@ export default function App() {
         <main className="flex-1 overflow-auto p-8">
           {page === "renewal" && <Renewal profile={profile} />}
           {page === "full" && <FullDowngrade profile={profile} />}
+          {page === "createuser" && <CreateUser />}
           {page === "settings" && <Settings onProfilesChanged={loadProfiles} />}
         </main>
       </div>

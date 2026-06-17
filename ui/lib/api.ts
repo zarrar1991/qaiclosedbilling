@@ -1,4 +1,4 @@
-import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, SubscriptionSearchResult, ProfilesList } from "../../electron/ipc.js";
+import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, SubscriptionSearchResult, ProfilesList, IClosedCreateRequest, IClosedResult, IClosedProgress } from "../../electron/ipc.js";
 import type { RunReport } from "../../src/types.js";
 
 interface Api {
@@ -15,5 +15,9 @@ interface Api {
   updateRenewal(profile: string, req: RenewalUpdateRequest): Promise<IpcResult<RenewalUpdateResult>>;
   runFullFlow(profile: string, req: { email: string; span: string }): Promise<IpcResult<RunReport>>;
   onProgress(cb: (p: { step: string; message: string }) => void): () => void;
+  // Create iClosed user
+  createIClosedUser(req: IClosedCreateRequest): Promise<IpcResult<IClosedResult>>;
+  onIClosedProgress(cb: (p: IClosedProgress) => void): () => void;
+  openExternal(url: string): Promise<IpcResult<boolean>>;
 }
 export const api = (window as unknown as { api: Api }).api;

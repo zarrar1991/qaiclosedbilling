@@ -1,15 +1,25 @@
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createRequire } from "node:module";
 import { parseConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
 import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
-import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList } from "./ipc.js";
+import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress } from "./ipc.js";
 import { getRenewalCandidates, searchSubscriptionsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// The iClosed engine is CommonJS (copied as-is). Load it via createRequire; the
+// .cjs sits next to the compiled main.js (copied by the electron:build script).
+const requireCjs = createRequire(import.meta.url);
+type IClosedEngine = {
+  createIClosedUser: (opts: Record<string, unknown>) => Promise<IClosedResult>;
+  generateRandomEmail: (prefix?: string, domain?: string) => string;
+};
+const iclosed = requireCjs("./iclosed-flow.cjs") as IClosedEngine;
 
 // Build config from a named profile (or the active one). All profiles share the
 // single .auth Stripe login.
@@ -95,6 +105,21 @@ ipcMain.handle(CH.renewalUpdate, (_e, p: { profile: string; req: RenewalUpdateRe
 ipcMain.handle(CH.fullflowRun, (e, p: { profile: string; email: string; span: string }) =>
   wrap(() => runFullFlowUi(loadCfg(p.profile), p.email, p.span, (pr) => e.sender.send(CH.fullflowProgress, pr))),
 );
+
+// --- Create iClosed user (in-process; streams onProgress to the renderer) ---
+ipcMain.handle(CH.iclosedCreate, (e, req: IClosedCreateRequest) =>
+  wrap(() =>
+    iclosed.createIClosedUser({
+      campaignUrl: req.campaignUrl,
+      email: req.emailMode === "custom" ? req.email : iclosed.generateRandomEmail(),
+      password: req.password,
+      headed: req.headed,
+      keepOpen: req.keepOpen,
+      onProgress: (pr: IClosedProgress) => e.sender.send(CH.iclosedProgress, pr),
+    }),
+  ),
+);
+ipcMain.handle(CH.openExternal, (_e, url: string) => wrap(async () => { await shell.openExternal(url); return true; }));
 
 app.whenReady().then(createWindow);
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });

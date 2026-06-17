@@ -9,3 +9,6 @@ artifacts/
 
 # playwright-cli discovery artifacts
 .playwright-cli/
+iclosed-module.zip
+.iclosed-module-extract/
+debug/

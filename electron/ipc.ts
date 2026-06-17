@@ -18,6 +18,25 @@ export interface DbCheckResult { table: string; ok: boolean; columns: { name: st
 // Profile management: list of profile names + which is the default/active.
 export interface ProfilesList { activeProfile: string; names: string[] }
 
+// Create iClosed user (signup → Stripe → onboarding via lib engine).
+export interface IClosedCreateRequest {
+  campaignUrl: string;
+  emailMode: "random" | "custom";
+  email?: string;
+  password: string;
+  headed: boolean;
+  keepOpen: boolean;
+}
+export interface IClosedResult { email: string; password: string; username: string; workspaceUrl: string }
+export interface IClosedProgress {
+  step: string;
+  ts?: number;
+  detail?: string;
+  done?: boolean;
+  error?: string;
+  result?: IClosedResult;
+}
+
 export const CH = {
   profilesList: "profiles:list",
   profilesGet: "profiles:get",
@@ -30,4 +49,7 @@ export const CH = {
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",
+  iclosedCreate: "iclosed:create",
+  iclosedProgress: "iclosed:progress",
+  openExternal: "shell:openExternal",
 } as const;
