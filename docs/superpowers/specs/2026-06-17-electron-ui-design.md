@@ -64,9 +64,13 @@ iclosed-billing/
 - `settings:save(values)` → writes `.env`, returns saved values.
 - `settings:testDb` → connect + run the `db:check` column checks; returns table/column
   status.
-- `renewal:getCandidates(email)` → `{ accountId, rows: SubscriptionRow[] }`.
+- `renewal:getCandidates(email)` → `{ accountId, rows: SubscriptionRow[] }`. **Only
+  non-deleted subscriptions** are returned — reuses the existing
+  `fetchSubscriptions` query (`WHERE "accountId" = $1 AND "deletedAt" IS NULL`). Deleted
+  rows are never shown or updatable.
 - `renewal:update({ id })` or `renewal:update({ accountId, mode:"all" })` → updated +
-  re-selected rows (old/new renewal).
+  re-selected rows (old/new renewal). The `id` always comes from the non-deleted candidate
+  set; the `mode:"all"` form keeps the `AND "deletedAt" IS NULL` guard.
 - `fullflow:run({ email, span })` → final `RunReport`. Streams progress via
   `fullflow:progress` events (`{ step, status, message }`).
 
@@ -74,9 +78,10 @@ iclosed-billing/
 
 ### Renewal page
 1. Email field + "Update renewal".
-2. On click → `renewal:getCandidates`. If **one** active sub → confirm inline and
-   `renewal:update`. If **multiple** → show **SubscriptionPicker** (id, status,
-   renewalDateTime, stripeSubscriptionId, createdAt); user selects → `renewal:update`.
+2. On click → `renewal:getCandidates` (returns only `deletedAt IS NULL` subscriptions). If
+   **one** active sub → confirm inline and `renewal:update`. If **multiple** → show
+   **SubscriptionPicker** (id, status, renewalDateTime, stripeSubscriptionId, createdAt);
+   user selects → `renewal:update`. Deleted subscriptions are excluded entirely.
 3. Success banner shows account id, subscription id, old → new renewal (UTC). Failure
    banner shows the error.
 
