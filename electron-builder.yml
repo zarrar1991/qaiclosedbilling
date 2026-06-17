@@ -1,0 +1,17 @@
+appId: io.iclosed.billing
+productName: iClosed Billing
+files:
+  - dist-electron/**
+  - dist-ui/**
+  - package.json
+extraResources:
+  # Bundle the Playwright browsers cache so the packaged app has Chromium.
+  - from: "${env.PLAYWRIGHT_BROWSERS_PATH}"
+    to: "ms-playwright"
+asarUnpack:
+  - "**/*.node"
+win:
+  target: nsis
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
