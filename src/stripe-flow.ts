@@ -182,6 +182,9 @@ export async function runSimulation(page: Page, cfg: AppConfig, hooks: StripeFlo
   const dialog = page.getByRole("alertdialog", { name: /run simulation/i });
   if (!(await dialog.isVisible().catch(() => false))) {
     const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
+    // The subscription detail page (and its test-clock panel) renders async after
+    // navigation, so wait for the button before deciding it's missing.
+    await btn.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
     if (await btn.isVisible().catch(() => false)) {
       await btn.click();
     } else {
