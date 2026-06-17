@@ -1,4 +1,6 @@
-import { chromium, type BrowserContext, type Page, type Locator } from "@playwright/test";
+// Use the production `playwright` package (not the `@playwright/test` devDependency,
+// which electron-builder strips from packaged builds — ERR_MODULE_NOT_FOUND at launch).
+import { chromium, type BrowserContext, type Page, type Locator } from "playwright";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { AppConfig, ParsedSpan } from "./types.js";

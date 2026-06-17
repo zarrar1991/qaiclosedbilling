@@ -142,7 +142,9 @@ function createWindow(): void {
     ...(app.isPackaged ? {} : existsSync(devIcon) ? { icon: devIcon } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
-  if (app.isPackaged) win.loadFile(join(__dirname, "../dist-ui/index.html"));
+  // Packaged layout: app/dist-electron/electron/main.js + app/dist-ui/index.html,
+  // so from __dirname (…/dist-electron/electron) the UI is two levels up.
+  if (app.isPackaged) win.loadFile(join(__dirname, "../../dist-ui/index.html"));
   else win.loadURL(process.env.VITE_DEV_SERVER_URL ?? "http://localhost:5173");
 }
 

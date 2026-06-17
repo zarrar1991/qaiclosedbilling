@@ -47,6 +47,7 @@
       "!iclosed-module.zip",
       "!.iclosed-module-extract/**",
       "!run.bat",
+      "!*.command",
       "!README.md",
       "!package-lock.json",
       "!tsconfig*.json",
