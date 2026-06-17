@@ -30,26 +30,35 @@ function generatePassword(length = 12): string {
 
 type RunState = "idle" | "running" | "success" | "error";
 
-const FORM_KEY = "iclosed.createUser";
-const savedForm: Record<string, unknown> = (() => {
-  try { return JSON.parse(localStorage.getItem(FORM_KEY) || "{}"); } catch { return {}; }
-})();
+// Module-level form cache: survives tab switches (the page remounts) but is
+// reset when the app restarts (module reloads), so a fresh launch loads the
+// latest defaults rather than the previous session's picks.
+const sessionForm = {
+  campaignUrl: "",
+  selectedCampaign: "",
+  selectedLink: "",
+  emailMode: "random" as "random" | "custom",
+  email: "",
+  password: "Demo@123",
+  headless: true,
+  closeWhenDone: false,
+};
 
 export function CreateUser({ profile }: { profile: string }) {
-  // All form selections persist across runs/restarts.
-  const [campaignUrl, setCampaignUrl] = useState((savedForm.campaignUrl as string) ?? "");
+  // Selections persist within the session (across tab switches) via sessionForm.
+  const [campaignUrl, setCampaignUrl] = useState(sessionForm.campaignUrl);
 
   // Campaigns dropdown — lazy: fetched fresh each time it's opened.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
-  const [selectedCampaign, setSelectedCampaign] = useState((savedForm.selectedCampaign as string) ?? ""); // campaign id
+  const [selectedCampaign, setSelectedCampaign] = useState(sessionForm.selectedCampaign); // campaign id
 
   // Campaign Link dropdown — fetched from the back-office API for the selected campaign.
   const [links, setLinks] = useState<CampaignLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
   const [linksError, setLinksError] = useState<string | null>(null);
-  const [selectedLink, setSelectedLink] = useState((savedForm.selectedLink as string) ?? ""); // hash
+  const [selectedLink, setSelectedLink] = useState(sessionForm.selectedLink); // hash
 
   async function loadCampaigns() {
     setLoadingCampaigns(true); setCampaignsError(null);
@@ -90,17 +99,15 @@ export function CreateUser({ profile }: { profile: string }) {
     setSelectedLink(hash);
     if (hash && setUrl) setCampaignUrl(campaignUrlFor(hash));
   }
-  const [emailMode, setEmailMode] = useState<"random" | "custom">((savedForm.emailMode as "random" | "custom") ?? "random");
-  const [email, setEmail] = useState((savedForm.email as string) ?? "");
-  const [password, setPassword] = useState((savedForm.password as string) ?? "Demo@123");
-  const [headless, setHeadless] = useState(savedForm.headless != null ? Boolean(savedForm.headless) : true);
-  const [closeWhenDone, setCloseWhenDone] = useState(Boolean(savedForm.closeWhenDone));
+  const [emailMode, setEmailMode] = useState<"random" | "custom">(sessionForm.emailMode);
+  const [email, setEmail] = useState(sessionForm.email);
+  const [password, setPassword] = useState(sessionForm.password);
+  const [headless, setHeadless] = useState(sessionForm.headless);
+  const [closeWhenDone, setCloseWhenDone] = useState(sessionForm.closeWhenDone);
 
-  // Persist all selections/inputs whenever they change.
+  // Mirror selections/inputs into the module cache so they survive tab switches.
   useEffect(() => {
-    localStorage.setItem(FORM_KEY, JSON.stringify({
-      campaignUrl, selectedCampaign, selectedLink, emailMode, email, password, headless, closeWhenDone,
-    }));
+    Object.assign(sessionForm, { campaignUrl, selectedCampaign, selectedLink, emailMode, email, password, headless, closeWhenDone });
   }, [campaignUrl, selectedCampaign, selectedLink, emailMode, email, password, headless, closeWhenDone]);
 
   const [state, setState] = useState<RunState>("idle");
