@@ -1,0 +1,5 @@
+# Shell/command scripts must stay LF so they run on macOS/Linux (CRLF breaks the
+# shebang). Keep the Windows launcher as CRLF.
+*.command text eol=lf
+*.sh      text eol=lf
+*.bat     text eol=crlf
