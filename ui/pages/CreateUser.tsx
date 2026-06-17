@@ -3,8 +3,11 @@ import { api } from "../lib/api.js";
 import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
+import { SearchableSelect } from "../components/SearchableSelect.js";
 import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
 import type { Campaign } from "../../src/types.js";
+
+const campaignUrlFor = (uuId: string) => `https://dev.iclosed.io/campaign?plan_hash=${uuId}`;
 
 // Ported from the module's renderer.js generatePassword: 12 chars, >=1 of each
 // class, shuffled (Fisher–Yates).
@@ -46,11 +49,19 @@ export function CreateUser({ profile }: { profile: string }) {
     setLoadingCampaigns(false);
     if (!r.ok) { setCampaignsError(r.error); return; }
     setCampaigns(r.data);
+    // Default-select the latest (first) campaign if nothing is chosen yet.
+    if (!selectedCampaign && r.data.length > 0) {
+      setSelectedCampaign(r.data[0].uuId);
+      if (!campaignUrl) setCampaignUrl(campaignUrlFor(r.data[0].uuId));
+    }
   }
+
+  // Initial load so the latest campaign is selected by default; re-fetched on open.
+  useEffect(() => { loadCampaigns(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profile]);
 
   function onPickCampaign(uuId: string) {
     setSelectedCampaign(uuId);
-    if (uuId) setCampaignUrl(`https://dev.iclosed.io/campaign?plan_hash=${uuId}`);
+    if (uuId) setCampaignUrl(campaignUrlFor(uuId));
   }
   const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
   const [email, setEmail] = useState("");
@@ -101,17 +112,15 @@ export function CreateUser({ profile }: { profile: string }) {
 
       <label className="block max-w-md">
         <span className="mb-1 block text-sm text-slate-400">Campaign</span>
-        <select
+        <SearchableSelect
+          options={campaigns.map((c) => ({ label: c.name, value: c.uuId }))}
           value={selectedCampaign}
+          onChange={onPickCampaign}
+          onOpen={loadCampaigns}
+          loading={loadingCampaigns}
           disabled={running}
-          onMouseDown={loadCampaigns}
-          onFocus={loadCampaigns}
-          onChange={(e) => onPickCampaign(e.target.value)}
-          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 outline-none focus:border-sky-500"
-        >
-          <option value="">{loadingCampaigns ? "Loading…" : "Select a campaign…"}</option>
-          {campaigns.map((c) => <option key={c.uuId} value={c.uuId}>{c.name}</option>)}
-        </select>
+          placeholder="Select a campaign…"
+        />
       </label>
       {campaignsError && <Banner kind="error" title="Couldn't load campaigns">{campaignsError}</Banner>}
 

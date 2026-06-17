@@ -31,7 +31,7 @@ function logQuery(sql: string, params: unknown[]): void {
 
 // All non-deleted campaigns (name + uuId) for the campaigns dropdown.
 export async function fetchCampaigns(pool: pg.Pool): Promise<Campaign[]> {
-  const sql = `SELECT name, "uuId" FROM campaigns WHERE "deletedAt" IS NULL ORDER BY name ASC;`;
+  const sql = `SELECT name, "uuId" FROM campaigns WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
   logQuery(sql, []);
   const res = await pool.query(sql);
   return res.rows.map((r) => ({ name: String(r.name), uuId: String(r.uuId) }));
