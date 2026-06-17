@@ -6,6 +6,7 @@ import { Banner } from "../components/Banner.js";
 const DB_KEYS = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSSLMODE", "PGSCHEMA"];
 const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_AUTH_PROFILE_DIR",
   "STRIPE_STEP_TIMEOUT_MS", "STRIPE_LONG_TIMEOUT_MS", "DEFAULT_RENEWAL_OFFSET_MINUTES", "PLAYWRIGHT_SLOW_MO_MS"];
+const BO_KEYS = ["BO_BASE_URL", "BO_EMAIL", "BO_PASSWORD"];
 
 export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void }) {
   const [names, setNames] = useState<string[]>([]);
@@ -124,6 +125,10 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase text-slate-400">Stripe</h2>
         {STRIPE_KEYS.map((k) => <Field key={k} label={k} value={vals[k] ?? ""} onChange={set(k)} />)}
+      </section>
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase text-slate-400">Back office API</h2>
+        {BO_KEYS.map((k) => <Field key={k} label={k} type={k === "BO_PASSWORD" ? "password" : "text"} value={vals[k] ?? ""} onChange={set(k)} />)}
       </section>
       <div className="flex gap-3">
         <button onClick={save} disabled={!selected} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">Save</button>

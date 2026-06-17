@@ -13,6 +13,7 @@ const CH = {
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",
   campaignsList: "campaigns:list",
+  campaignLinksList: "campaignlinks:list",
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",
@@ -33,6 +34,7 @@ contextBridge.exposeInMainWorld("api", {
   getCandidates: (profile, email) => ipcRenderer.invoke(CH.renewalGetCandidates, { profile, email }),
   searchSubscriptions: (profile, email) => ipcRenderer.invoke(CH.subscriptionsSearch, { profile, email }),
   listCampaigns: (profile) => ipcRenderer.invoke(CH.campaignsList, profile),
+  listCampaignLinks: (profile, campaignId) => ipcRenderer.invoke(CH.campaignLinksList, { profile, campaignId }),
   updateRenewal: (profile, req) => ipcRenderer.invoke(CH.renewalUpdate, { profile, req }),
   runFullFlow: (profile, req) => ipcRenderer.invoke(CH.fullflowRun, { profile, email: req.email, span: req.span }),
   onProgress: (cb) => {

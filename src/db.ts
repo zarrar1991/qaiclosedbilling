@@ -29,12 +29,12 @@ function logQuery(sql: string, params: unknown[]): void {
   console.log("-----------");
 }
 
-// All non-deleted campaigns (name + uuId) for the campaigns dropdown.
+// All non-deleted campaigns (id + name) for the campaigns dropdown, latest first.
 export async function fetchCampaigns(pool: pg.Pool): Promise<Campaign[]> {
-  const sql = `SELECT name, "uuId" FROM campaigns WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
+  const sql = `SELECT id, name FROM campaigns WHERE "deletedAt" IS NULL ORDER BY "createdAt" DESC;`;
   logQuery(sql, []);
   const res = await pool.query(sql);
-  return res.rows.map((r) => ({ name: String(r.name), uuId: String(r.uuId) }));
+  return res.rows.map((r) => ({ id: Number(r.id), name: String(r.name) }));
 }
 
 export async function lookupAccountId(pool: pg.Pool, email: string): Promise<string | null> {

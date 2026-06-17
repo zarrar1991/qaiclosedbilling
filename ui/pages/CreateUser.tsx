@@ -5,9 +5,9 @@ import { Banner } from "../components/Banner.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
 import { SearchableSelect } from "../components/SearchableSelect.js";
 import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
-import type { Campaign } from "../../src/types.js";
+import type { Campaign, CampaignLink } from "../../src/types.js";
 
-const campaignUrlFor = (uuId: string) => `https://dev.iclosed.io/campaign?plan_hash=${uuId}`;
+const campaignUrlFor = (hash: string) => `https://dev.iclosed.io/campaign?plan_hash=${hash}`;
 
 // Ported from the module's renderer.js generatePassword: 12 chars, >=1 of each
 // class, shuffled (Fisher–Yates).
@@ -41,7 +41,13 @@ export function CreateUser({ profile }: { profile: string }) {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
-  const [selectedCampaign, setSelectedCampaign] = useState("");
+  const [selectedCampaign, setSelectedCampaign] = useState(""); // campaign id (as string)
+
+  // Campaign Link dropdown — fetched from the back-office API for the selected campaign.
+  const [links, setLinks] = useState<CampaignLink[]>([]);
+  const [loadingLinks, setLoadingLinks] = useState(false);
+  const [linksError, setLinksError] = useState<string | null>(null);
+  const [selectedLink, setSelectedLink] = useState(""); // hash
 
   async function loadCampaigns() {
     setLoadingCampaigns(true); setCampaignsError(null);
@@ -50,18 +56,32 @@ export function CreateUser({ profile }: { profile: string }) {
     if (!r.ok) { setCampaignsError(r.error); return; }
     setCampaigns(r.data);
     // Default-select the latest (first) campaign if nothing is chosen yet.
-    if (!selectedCampaign && r.data.length > 0) {
-      setSelectedCampaign(r.data[0].uuId);
-      if (!campaignUrl) setCampaignUrl(campaignUrlFor(r.data[0].uuId));
-    }
+    if (!selectedCampaign && r.data.length > 0) onPickCampaign(String(r.data[0].id));
+  }
+
+  async function loadLinks(campaignId: string) {
+    if (!campaignId) return;
+    setLoadingLinks(true); setLinksError(null);
+    const r = await api.listCampaignLinks(profile, Number(campaignId));
+    setLoadingLinks(false);
+    if (!r.ok) { setLinksError(r.error); setLinks([]); return; }
+    setLinks(r.data);
+    // Default-select the first link and fill the URL (if none chosen / URL empty).
+    if (r.data.length > 0 && !selectedLink) onPickLink(r.data[0].hash, !campaignUrl);
   }
 
   // Initial load so the latest campaign is selected by default; re-fetched on open.
   useEffect(() => { loadCampaigns(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profile]);
 
-  function onPickCampaign(uuId: string) {
-    setSelectedCampaign(uuId);
-    if (uuId) setCampaignUrl(campaignUrlFor(uuId));
+  function onPickCampaign(id: string) {
+    setSelectedCampaign(id);
+    setSelectedLink(""); setLinks([]); setLinksError(null);
+    loadLinks(id);
+  }
+
+  function onPickLink(hash: string, setUrl = true) {
+    setSelectedLink(hash);
+    if (hash && setUrl) setCampaignUrl(campaignUrlFor(hash));
   }
   const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
   const [email, setEmail] = useState("");
@@ -113,7 +133,7 @@ export function CreateUser({ profile }: { profile: string }) {
       <label className="block max-w-md">
         <span className="mb-1 block text-sm text-slate-400">Campaign</span>
         <SearchableSelect
-          options={campaigns.map((c) => ({ label: c.name, value: c.uuId }))}
+          options={campaigns.map((c) => ({ label: c.name, value: String(c.id) }))}
           value={selectedCampaign}
           onChange={onPickCampaign}
           onOpen={loadCampaigns}
@@ -123,6 +143,20 @@ export function CreateUser({ profile }: { profile: string }) {
         />
       </label>
       {campaignsError && <Banner kind="error" title="Couldn't load campaigns">{campaignsError}</Banner>}
+
+      <label className="block max-w-md">
+        <span className="mb-1 block text-sm text-slate-400">Campaign Link</span>
+        <SearchableSelect
+          options={links.map((l) => ({ label: l.label, value: l.hash }))}
+          value={selectedLink}
+          onChange={(h) => onPickLink(h)}
+          onOpen={() => loadLinks(selectedCampaign)}
+          loading={loadingLinks}
+          disabled={running || !selectedCampaign}
+          placeholder={selectedCampaign ? "Select a campaign link…" : "Pick a campaign first"}
+        />
+      </label>
+      {linksError && <Banner kind="error" title="Couldn't load campaign links">{linksError}</Banner>}
 
       <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
         placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />

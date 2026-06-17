@@ -34,8 +34,14 @@ export interface SubscriptionRow {
 }
 
 export interface Campaign {
+  id: number;
   name: string;
-  uuId: string;
+}
+
+// A campaign link from the back-office API (data.formattedCampaignLinks[*]).
+export interface CampaignLink {
+  label: string; // friendly, e.g. "Startup Month"
+  hash: string;  // used to build the campaign URL (plan_hash)
 }
 
 export interface ParsedSpan {

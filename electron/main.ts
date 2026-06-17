@@ -6,7 +6,7 @@ import { parseConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
 import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
-import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress } from "./ipc.js";
+import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress, type CampaignLink } from "./ipc.js";
 import { getRenewalCandidates, searchSubscriptionsUi, listCampaignsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
@@ -37,6 +37,53 @@ function loadCfg(profileName?: string): AppConfig {
 function listProfiles(): ProfilesList {
   const f = readProfiles(profilesPath(), envPath());
   return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
+}
+
+// Raw profile values (for back-office API creds that aren't part of parseConfig).
+function profileValues(name?: string): Record<string, string> {
+  const f = readProfiles(profilesPath(), envPath());
+  return f.profiles[name || f.activeProfile] ?? {};
+}
+
+// --- Back-office API token (in-memory only; per profile; cleared on quit) ---
+const boTokens = new Map<string, string>();
+
+async function getBoToken(profile: string, force = false): Promise<string> {
+  if (!force && boTokens.has(profile)) return boTokens.get(profile)!;
+  const v = profileValues(profile);
+  const base = (v.BO_BASE_URL || "").replace(/\/+$/, "");
+  if (!base || !v.BO_EMAIL || !v.BO_PASSWORD) {
+    throw new Error("Back-office API not configured (set BO_BASE_URL, BO_EMAIL, BO_PASSWORD in Settings).");
+  }
+  const res = await fetch(`${base}/auth/authenticate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: v.BO_EMAIL, password: v.BO_PASSWORD, isBackOffice: true }),
+  });
+  if (!res.ok) throw new Error(`Auth failed (${res.status})`);
+  const body = (await res.json()) as { accessToken?: string };
+  if (!body.accessToken) throw new Error("Auth response had no accessToken");
+  boTokens.set(profile, body.accessToken);
+  return body.accessToken;
+}
+
+async function fetchCampaignLinks(profile: string, campaignId: number): Promise<CampaignLink[]> {
+  const base = (profileValues(profile).BO_BASE_URL || "").replace(/\/+$/, "");
+  const call = async (token: string) =>
+    fetch(`${base}/campaigns?id=${campaignId}`, { headers: { Authorization: `Bearer ${token}` } });
+
+  let res = await call(await getBoToken(profile));
+  if (res.status === 401) res = await call(await getBoToken(profile, true)); // refresh once
+  if (!res.ok) throw new Error(`Campaigns API failed (${res.status})`);
+
+  const json = (await res.json()) as { data?: { formattedCampaignLinks?: Array<Record<string, unknown>> } };
+  const links = json.data?.formattedCampaignLinks ?? [];
+  return links
+    .filter((l) => typeof l.hash === "string" && l.hash)
+    .map((l) => ({
+      label: [l.name, l.cycle].filter(Boolean).join(" ") || String(l.hash),
+      hash: String(l.hash),
+    }));
 }
 
 async function wrap<T>(fn: () => Promise<T>): Promise<IpcResult<T>> {
@@ -100,6 +147,9 @@ ipcMain.handle(CH.subscriptionsSearch, (_e, p: { profile: string; email: string 
   wrap(() => searchSubscriptionsUi(loadCfg(p.profile), p.email)),
 );
 ipcMain.handle(CH.campaignsList, (_e, profile: string) => wrap(() => listCampaignsUi(loadCfg(profile))));
+ipcMain.handle(CH.campaignLinksList, (_e, p: { profile: string; campaignId: number }) =>
+  wrap(() => fetchCampaignLinks(p.profile, p.campaignId)),
+);
 ipcMain.handle(CH.renewalUpdate, (_e, p: { profile: string; req: RenewalUpdateRequest }) =>
   wrap(() => updateRenewalUi(loadCfg(p.profile), p.req)),
 );
@@ -122,6 +172,12 @@ ipcMain.handle(CH.iclosedCreate, (e, req: IClosedCreateRequest) =>
 );
 ipcMain.handle(CH.openExternal, (_e, url: string) => wrap(async () => { await shell.openExternal(url); return true; }));
 
-app.whenReady().then(createWindow);
+app.whenReady().then(() => {
+  createWindow();
+  // Generate the back-office token for the active profile up front (best-effort).
+  getBoToken(listProfiles().activeProfile).catch(() => undefined);
+});
 app.on("window-all-closed", () => { if (process.platform !== "darwin") app.quit(); });
 app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
+// Kill tokens when the app closes (in-memory only — discard).
+app.on("before-quit", () => { boTokens.clear(); });
