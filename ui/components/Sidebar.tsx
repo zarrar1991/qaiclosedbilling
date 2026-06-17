@@ -2,7 +2,7 @@ import React from "react";
 export type Page = "renewal" | "full" | "settings";
 export function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   const items: { id: Page; label: string }[] = [
-    { id: "renewal", label: "Renewal" },
+    { id: "renewal", label: "Renewal Date Updater" },
     { id: "full", label: "Full downgrade" },
     { id: "settings", label: "Settings" },
   ];

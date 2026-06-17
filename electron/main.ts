@@ -27,7 +27,7 @@ async function wrap<T>(fn: () => Promise<T>): Promise<IpcResult<T>> {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1100, height: 760, backgroundColor: "#0b1020",
+    width: 1440, height: 900, backgroundColor: "#0b1020",
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   if (app.isPackaged) win.loadFile(join(__dirname, "../dist-ui/index.html"));
