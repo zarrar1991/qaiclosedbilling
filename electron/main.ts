@@ -2,6 +2,7 @@ import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
+import https from "node:https";
 import { parseConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
@@ -48,6 +49,48 @@ function profileValues(name?: string): Record<string, string> {
 // --- Back-office API token (in-memory only; per profile; cleared on quit) ---
 const boTokens = new Map<string, string>();
 
+// The corporate proxy intercepts TLS with an untrusted cert (UNABLE_TO_VERIFY_
+// LEAF_SIGNATURE), which Node's fetch rejects. Use node:https with a scoped
+// insecure agent so the cert bypass applies ONLY to these back-office calls
+// (mirrors the pg ssl rejectUnauthorized:false behavior).
+const insecureAgent = new https.Agent({ rejectUnauthorized: false });
+
+function httpJson(
+  method: "GET" | "POST",
+  urlStr: string,
+  opts: { token?: string; body?: unknown } = {},
+): Promise<{ status: number; json: unknown }> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const data = opts.body != null ? JSON.stringify(opts.body) : null;
+    const req = https.request(
+      {
+        method,
+        hostname: u.hostname,
+        port: u.port || 443,
+        path: u.pathname + u.search,
+        agent: insecureAgent,
+        headers: {
+          ...(opts.token ? { Authorization: `Bearer ${opts.token}` } : {}),
+          ...(data ? { "Content-Type": "application/json", "Content-Length": Buffer.byteLength(data) } : {}),
+        },
+      },
+      (res) => {
+        let buf = "";
+        res.on("data", (c) => (buf += c));
+        res.on("end", () => {
+          let json: unknown = null;
+          try { json = buf ? JSON.parse(buf) : null; } catch { /* non-JSON */ }
+          resolve({ status: res.statusCode || 0, json });
+        });
+      },
+    );
+    req.on("error", reject);
+    if (data) req.write(data);
+    req.end();
+  });
+}
+
 async function getBoToken(profile: string, force = false): Promise<string> {
   if (!force && boTokens.has(profile)) return boTokens.get(profile)!;
   const v = profileValues(profile);
@@ -55,29 +98,26 @@ async function getBoToken(profile: string, force = false): Promise<string> {
   if (!base || !v.BO_EMAIL || !v.BO_PASSWORD) {
     throw new Error("Back-office API not configured (set BO_BASE_URL, BO_EMAIL, BO_PASSWORD in Settings).");
   }
-  const res = await fetch(`${base}/auth/authenticate`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email: v.BO_EMAIL, password: v.BO_PASSWORD, isBackOffice: true }),
+  const res = await httpJson("POST", `${base}/auth/authenticate`, {
+    body: { email: v.BO_EMAIL, password: v.BO_PASSWORD, isBackOffice: true },
   });
-  if (!res.ok) throw new Error(`Auth failed (${res.status})`);
-  const body = (await res.json()) as { accessToken?: string };
-  if (!body.accessToken) throw new Error("Auth response had no accessToken");
-  boTokens.set(profile, body.accessToken);
-  return body.accessToken;
+  if (res.status < 200 || res.status >= 300) throw new Error(`Auth failed (${res.status})`);
+  const token = (res.json as { accessToken?: string } | null)?.accessToken;
+  if (!token) throw new Error("Auth response had no accessToken");
+  boTokens.set(profile, token);
+  return token;
 }
 
 async function fetchCampaignLinks(profile: string, campaignId: number): Promise<CampaignLink[]> {
   const base = (profileValues(profile).BO_BASE_URL || "").replace(/\/+$/, "");
-  const call = async (token: string) =>
-    fetch(`${base}/campaigns?id=${campaignId}`, { headers: { Authorization: `Bearer ${token}` } });
+  const url = `${base}/campaigns?id=${campaignId}`;
 
-  let res = await call(await getBoToken(profile));
-  if (res.status === 401) res = await call(await getBoToken(profile, true)); // refresh once
-  if (!res.ok) throw new Error(`Campaigns API failed (${res.status})`);
+  let res = await httpJson("GET", url, { token: await getBoToken(profile) });
+  if (res.status === 401) res = await httpJson("GET", url, { token: await getBoToken(profile, true) }); // refresh once
+  if (res.status < 200 || res.status >= 300) throw new Error(`Campaigns API failed (${res.status})`);
 
-  const json = (await res.json()) as { data?: { formattedCampaignLinks?: Array<Record<string, unknown>> } };
-  const links = json.data?.formattedCampaignLinks ?? [];
+  const links = (res.json as { data?: { formattedCampaignLinks?: Array<Record<string, unknown>> } } | null)
+    ?.data?.formattedCampaignLinks ?? [];
   return links
     .filter((l) => typeof l.hash === "string" && l.hash)
     .map((l) => ({
