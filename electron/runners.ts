@@ -1,5 +1,6 @@
 import type { AppConfig, RunReport } from "../src/types.js";
-import { createPool, lookupAccountId, fetchSubscriptions, fetchAllSubscriptions, updateRenewal, reselectByIds } from "../src/db.js";
+import { createPool, lookupAccountId, fetchSubscriptions, fetchAllSubscriptions, fetchCampaigns, updateRenewal, reselectByIds } from "../src/db.js";
+import type { Campaign } from "../src/types.js";
 import { chooseTargetSubscription } from "../src/selection.js";
 import { computeRenewalUTC, parseSpan } from "../src/time.js";
 import { runStripeSimulation } from "../src/stripe-flow.js";
@@ -13,6 +14,16 @@ export async function getRenewalCandidates(cfg: AppConfig, email: string): Promi
     const rows = await fetchSubscriptions(pool, accountId); // deletedAt IS NULL only
     if (rows.length === 0) throw new Error("No active (non-deleted) subscription found.");
     return { accountId, rows };
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
+// All non-deleted campaigns for the Create-user dropdown.
+export async function listCampaignsUi(cfg: AppConfig): Promise<Campaign[]> {
+  const pool = createPool(cfg);
+  try {
+    return await fetchCampaigns(pool);
   } finally {
     await pool.end().catch(() => undefined);
   }

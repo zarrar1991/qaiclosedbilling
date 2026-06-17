@@ -1,5 +1,5 @@
 import pg from "pg";
-import type { AppConfig, SubscriptionRow } from "./types.js";
+import type { AppConfig, SubscriptionRow, Campaign } from "./types.js";
 
 const { Pool } = pg;
 
@@ -27,6 +27,14 @@ function logQuery(sql: string, params: unknown[]): void {
   console.log(sql.trim());
   console.log("params:", JSON.stringify(params));
   console.log("-----------");
+}
+
+// All non-deleted campaigns (name + uuId) for the campaigns dropdown.
+export async function fetchCampaigns(pool: pg.Pool): Promise<Campaign[]> {
+  const sql = `SELECT name, "uuId" FROM campaigns WHERE "deletedAt" IS NULL ORDER BY name ASC;`;
+  logQuery(sql, []);
+  const res = await pool.query(sql);
+  return res.rows.map((r) => ({ name: String(r.name), uuId: String(r.uuId) }));
 }
 
 export async function lookupAccountId(pool: pg.Pool, email: string): Promise<string | null> {

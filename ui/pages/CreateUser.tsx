@@ -4,6 +4,7 @@ import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
 import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
+import type { Campaign } from "../../src/types.js";
 
 // Ported from the module's renderer.js generatePassword: 12 chars, >=1 of each
 // class, shuffled (Fisher–Yates).
@@ -28,10 +29,29 @@ type RunState = "idle" | "running" | "success" | "error";
 
 const CAMPAIGN_URL_KEY = "iclosed.campaignUrl";
 
-export function CreateUser() {
+export function CreateUser({ profile }: { profile: string }) {
   // Persist the campaign URL across runs/restarts so it isn't re-entered each time.
   const [campaignUrl, setCampaignUrl] = useState(() => localStorage.getItem(CAMPAIGN_URL_KEY) ?? "");
   useEffect(() => { localStorage.setItem(CAMPAIGN_URL_KEY, campaignUrl); }, [campaignUrl]);
+
+  // Campaigns dropdown — lazy: fetched fresh each time it's opened.
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [loadingCampaigns, setLoadingCampaigns] = useState(false);
+  const [campaignsError, setCampaignsError] = useState<string | null>(null);
+  const [selectedCampaign, setSelectedCampaign] = useState("");
+
+  async function loadCampaigns() {
+    setLoadingCampaigns(true); setCampaignsError(null);
+    const r = await api.listCampaigns(profile);
+    setLoadingCampaigns(false);
+    if (!r.ok) { setCampaignsError(r.error); return; }
+    setCampaigns(r.data);
+  }
+
+  function onPickCampaign(uuId: string) {
+    setSelectedCampaign(uuId);
+    if (uuId) setCampaignUrl(`https://dev.iclosed.io/campaign?plan_hash=${uuId}`);
+  }
   const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("Demo@123");
@@ -78,6 +98,22 @@ export function CreateUser() {
   return (
     <div className="max-w-2xl space-y-5">
       <h1 className="text-2xl font-bold">Create iClosed user</h1>
+
+      <label className="block max-w-md">
+        <span className="mb-1 block text-sm text-slate-400">Campaign</span>
+        <select
+          value={selectedCampaign}
+          disabled={running}
+          onMouseDown={loadCampaigns}
+          onFocus={loadCampaigns}
+          onChange={(e) => onPickCampaign(e.target.value)}
+          className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 outline-none focus:border-sky-500"
+        >
+          <option value="">{loadingCampaigns ? "Loading…" : "Select a campaign…"}</option>
+          {campaigns.map((c) => <option key={c.uuId} value={c.uuId}>{c.name}</option>)}
+        </select>
+      </label>
+      {campaignsError && <Banner kind="error" title="Couldn't load campaigns">{campaignsError}</Banner>}
 
       <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
         placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />

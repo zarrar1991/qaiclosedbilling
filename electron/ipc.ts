@@ -1,4 +1,6 @@
-import type { SubscriptionRow, RunReport } from "../src/types.js";
+import type { SubscriptionRow, RunReport, Campaign } from "../src/types.js";
+
+export type { Campaign };
 
 export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -46,6 +48,7 @@ export const CH = {
   settingsTestDb: "settings:testDb",
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",
+  campaignsList: "campaigns:list",
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",

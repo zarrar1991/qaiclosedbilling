@@ -1,5 +1,5 @@
 import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, SubscriptionSearchResult, ProfilesList, IClosedCreateRequest, IClosedResult, IClosedProgress } from "../../electron/ipc.js";
-import type { RunReport } from "../../src/types.js";
+import type { RunReport, Campaign } from "../../src/types.js";
 
 interface Api {
   // Profiles
@@ -12,6 +12,7 @@ interface Api {
   testDb(profile: string): Promise<IpcResult<{ connected: boolean }>>;
   getCandidates(profile: string, email: string): Promise<IpcResult<RenewalCandidates>>;
   searchSubscriptions(profile: string, email: string): Promise<IpcResult<SubscriptionSearchResult>>;
+  listCampaigns(profile: string): Promise<IpcResult<Campaign[]>>;
   updateRenewal(profile: string, req: RenewalUpdateRequest): Promise<IpcResult<RenewalUpdateResult>>;
   runFullFlow(profile: string, req: { email: string; span: string }): Promise<IpcResult<RunReport>>;
   onProgress(cb: (p: { step: string; message: string }) => void): () => void;

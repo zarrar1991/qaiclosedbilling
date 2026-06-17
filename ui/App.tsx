@@ -41,7 +41,7 @@ export default function App() {
         <main className="flex-1 overflow-auto p-8">
           {page === "renewal" && <Renewal profile={profile} />}
           {page === "full" && <FullDowngrade profile={profile} />}
-          {page === "createuser" && <CreateUser />}
+          {page === "createuser" && <CreateUser profile={profile} />}
           {page === "settings" && <Settings onProfilesChanged={loadProfiles} />}
         </main>
       </div>

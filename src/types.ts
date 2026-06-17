@@ -33,6 +33,11 @@ export interface SubscriptionRow {
   createdAt: string | null;
 }
 
+export interface Campaign {
+  name: string;
+  uuId: string;
+}
+
 export interface ParsedSpan {
   unit: "day" | "month" | "year";
   amount: number;

@@ -7,7 +7,7 @@ import { createPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
 import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
 import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress } from "./ipc.js";
-import { getRenewalCandidates, searchSubscriptionsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
+import { getRenewalCandidates, searchSubscriptionsUi, listCampaignsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -99,6 +99,7 @@ ipcMain.handle(CH.renewalGetCandidates, (_e, p: { profile: string; email: string
 ipcMain.handle(CH.subscriptionsSearch, (_e, p: { profile: string; email: string }) =>
   wrap(() => searchSubscriptionsUi(loadCfg(p.profile), p.email)),
 );
+ipcMain.handle(CH.campaignsList, (_e, profile: string) => wrap(() => listCampaignsUi(loadCfg(profile))));
 ipcMain.handle(CH.renewalUpdate, (_e, p: { profile: string; req: RenewalUpdateRequest }) =>
   wrap(() => updateRenewalUi(loadCfg(p.profile), p.req)),
 );
