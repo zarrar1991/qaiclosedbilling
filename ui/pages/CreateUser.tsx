@@ -78,9 +78,6 @@ export function CreateUser() {
   return (
     <div className="max-w-2xl space-y-5">
       <h1 className="text-2xl font-bold">Create iClosed user</h1>
-      <p className="text-sm text-slate-400">
-        Automates signup → Stripe (test card 4242…) → onboarding on dev.iclosed.io. Requires Google Chrome installed.
-      </p>
 
       <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
         placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />
