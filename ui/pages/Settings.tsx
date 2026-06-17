@@ -3,6 +3,7 @@ import { api } from "../lib/api.js";
 import { Field } from "../components/Field.js";
 import { Select } from "../components/Select.js";
 import { useToast } from "../components/Toast.js";
+import { ConfirmDialog } from "../components/ConfirmDialog.js";
 
 const DB_KEYS = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSSLMODE", "PGSCHEMA"];
 const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_AUTH_PROFILE_DIR",
@@ -16,6 +17,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
   const [selected, setSelected] = useState<string>("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [newName, setNewName] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   async function loadProfile(name: string) {
     if (!name) { setVals({}); return; }
@@ -95,8 +97,8 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
   }
 
   async function deleteProfile() {
+    setConfirmDelete(false);
     if (!selected) return;
-    if (!window.confirm(`Delete profile "${selected}"?`)) return;
     const r = await api.deleteProfile(selected);
     if (!r.ok) { toast("error", "Delete failed", r.error); return; }
     setNames(r.data.names);
@@ -138,7 +140,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
             {names.map((n) => <option key={n} value={n}>{n}{n === active ? " (default)" : ""}</option>)}
           </Select>
           <button onClick={makeActive} disabled={!selected} className="ic-btn-secondary px-4 py-[7px] text-[12.5px]">Set as default</button>
-          <button onClick={deleteProfile} disabled={!selected} className="ic-btn-danger px-4 py-[7px] text-[12.5px]">Delete</button>
+          <button onClick={() => setConfirmDelete(true)} disabled={!selected} className="ic-btn-danger px-4 py-[7px] text-[12.5px]">Delete</button>
         </div>
         <span className="ic-sublabel">New profile name</span>
         <div className="flex flex-wrap items-center gap-2.5">
@@ -163,6 +165,16 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
         <button onClick={save} disabled={!selected} className="ic-btn-primary px-5 py-2 text-[13px]">Save</button>
         <button onClick={test} disabled={!selected} className="ic-btn-secondary px-[18px] py-[7px] text-[13px]">Test DB connection</button>
       </div>
+
+      <ConfirmDialog
+        open={confirmDelete}
+        title="Delete profile"
+        message={<>Delete profile <span className="font-bold text-ink">&ldquo;{selected}&rdquo;</span>? This can&rsquo;t be undone.</>}
+        confirmLabel="Delete"
+        variant="danger"
+        onConfirm={deleteProfile}
+        onCancel={() => setConfirmDelete(false)}
+      />
     </div>
   );
 }
