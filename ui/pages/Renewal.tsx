@@ -18,17 +18,19 @@ export function Renewal() {
     setBusy(false);
     if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
     setAccountId(res.data.accountId);
-    if (res.data.rows.length === 1) await doUpdate(res.data.rows[0].id);
+    if (res.data.rows.length === 1) await doUpdate(res.data.rows[0].id, res.data.accountId);
     else setRows(res.data.rows);
   }
 
-  async function doUpdate(id: string) {
+  // acct is passed explicitly because React state (accountId) hasn't applied yet
+  // on the single-subscription path; fall back to state for the picker path.
+  async function doUpdate(id: string, acct?: string) {
     setBusy(true); setRows(null);
     const res = await api.updateRenewal({ id });
     setBusy(false);
     if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
     const r = res.data.reselected[0];
-    setResult({ ok: true, msg: `Account ${accountId}, subscription ${r.id} → renewal ${r.renewalDateTime} (UTC).` });
+    setResult({ ok: true, msg: `Account ${acct ?? accountId}, subscription ${r.id} → renewal ${r.renewalDateTime} (UTC).` });
   }
 
   return (
