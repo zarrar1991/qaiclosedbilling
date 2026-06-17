@@ -3,10 +3,10 @@
 @tailwind utilities;
 body { @apply bg-slate-950 text-slate-100; }
 
-/* Fancy, slim scrollbars (Chromium / Electron) */
+/* Slim, dark matte-black scrollbars (Chromium / Electron) */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #38bdf8 transparent;
+  scrollbar-color: #18181b transparent;
 }
 ::-webkit-scrollbar {
   width: 10px;
@@ -18,12 +18,12 @@ body { @apply bg-slate-950 text-slate-100; }
 }
 ::-webkit-scrollbar-thumb {
   border-radius: 9999px;
-  background: linear-gradient(135deg, #38bdf8, #818cf8);
+  background: #161618;
   background-clip: content-box;
   border: 2px solid transparent;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(135deg, #0ea5e9, #6366f1);
+  background: #242427;
   background-clip: content-box;
   border: 2px solid transparent;
 }
