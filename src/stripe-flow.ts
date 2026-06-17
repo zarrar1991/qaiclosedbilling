@@ -1,4 +1,4 @@
-import { chromium, type BrowserContext, type Page } from "@playwright/test";
+import { chromium, type BrowserContext, type Page, type Locator } from "@playwright/test";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import type { AppConfig, ParsedSpan } from "./types.js";
@@ -26,7 +26,13 @@ const ARTIFACTS = "artifacts";
 async function shot(page: Page, name: string): Promise<void> {
   const dir = join(ARTIFACTS, "screenshots");
   mkdirSync(dir, { recursive: true });
-  await page.screenshot({ path: join(dir, `${Date.now()}-${name}.png`), fullPage: true });
+  await page.screenshot({ path: join(dir, `${Date.now()}-${name}.png`), fullPage: true }).catch(() => undefined);
+}
+
+// Parse a human date like "August 17, 2026" or "Jun 17, 2026" into a Date.
+function parseHumanDate(s: string): Date | null {
+  const d = new Date(s.replace(/\s+at\s+.*/i, "").trim());
+  return Number.isNaN(d.getTime()) ? null : d;
 }
 
 export async function launchStripeContext(cfg: AppConfig): Promise<BrowserContext> {
@@ -42,23 +48,32 @@ export async function launchStripeContext(cfg: AppConfig): Promise<BrowserContex
   return context;
 }
 
+function accountSwitcher(page: Page): Locator {
+  return page.getByRole("button", { name: /account options and switcher/i }).first();
+}
+
 async function ensureLoggedIn(page: Page, cfg: AppConfig): Promise<void> {
   await page.goto(cfg.stripe.dashboardUrl, { waitUntil: "domcontentloaded" });
-  // If redirected to a login/2FA page, pause for manual completion.
-  if (/login|signin|authenticate/i.test(page.url())) {
+  // If we land on the login/auth flow, pause for manual completion (incl. 2FA).
+  if (/\/login|\/signin|authenticate/i.test(page.url()) || (await accountSwitcher(page).count()) === 0) {
     await promptEnterWhenReady(
-      "Stripe login/2FA required. Complete login in the opened browser, navigate to the dashboard,",
+      "Stripe login/2FA may be required. Complete login in the opened browser so the dashboard is visible,",
     );
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
   }
 }
 
+// Step 3-4: ensure the iclosed.io(development) environment is selected.
 export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig): Promise<void> {
-  const already = page.getByText(cfg.stripe.environmentName, { exact: false });
-  if (await already.first().isVisible().catch(() => false)) return;
-  await page.getByRole("button", { name: /menu|account|switch/i }).first().click();
-  const option = page.getByText(cfg.stripe.environmentName, { exact: false });
-  if (await option.first().isVisible().catch(() => false)) {
-    await option.first().click();
+  const switcher = accountSwitcher(page);
+  const name = (await switcher.getAttribute("aria-label").catch(() => null)) ?? "";
+  if (name.toLowerCase().includes(cfg.stripe.environmentName.toLowerCase())) return;
+
+  await switcher.click();
+  const option = page.getByRole("menuitem", { name: new RegExp(cfg.stripe.environmentName, "i") }).first();
+  if (await option.isVisible().catch(() => false)) {
+    await option.click();
+    await page.waitForLoadState("domcontentloaded").catch(() => undefined);
   } else {
     await promptEnterWhenReady(
       `Could not auto-select environment "${cfg.stripe.environmentName}". Select it manually,`,
@@ -66,42 +81,52 @@ export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig): Pro
   }
 }
 
-export async function ensureSandboxMode(page: Page): Promise<void> {
-  await page.getByRole("button", { name: /menu|account|switch/i }).first().click();
-  const sandbox = page.getByText(/switch to sandbox/i);
-  if (await sandbox.first().isVisible().catch(() => false)) {
-    await sandbox.first().click();
+// Steps 5-7: switch into a sandbox / Test mode. Detected by "/test/" in the URL.
+export async function ensureTestMode(page: Page): Promise<void> {
+  if (page.url().includes("/test/")) return;
+
+  await accountSwitcher(page).click();
+  const switchToSandbox = page.getByRole("menuitem", { name: /switch to sandbox/i }).first();
+  if (await switchToSandbox.isVisible().catch(() => false)) {
+    await switchToSandbox.click(); // opens the sandbox submenu
   } else {
-    await promptEnterWhenReady("Could not find 'Switch to sandbox'. Switch manually,");
+    await promptEnterWhenReady("Could not find 'Switch to sandbox'. Switch to Test mode manually,");
+    return;
   }
+
+  const testMode = page.getByRole("menuitem", { name: /^test mode$/i }).first();
+  if (await testMode.isVisible().catch(() => false)) {
+    await testMode.click();
+  } else {
+    await promptEnterWhenReady("Could not find the 'Test mode' option. Select it manually,");
+    return;
+  }
+  await page.waitForURL(/\/test\//, { timeout: 30000 }).catch(() => undefined);
 }
 
-export async function ensureTestModeEnabled(page: Page): Promise<void> {
-  const toggle = page.getByText(/test mode/i).first();
-  if (await toggle.isVisible().catch(() => false)) {
-    const isOn = await toggle.getAttribute("aria-checked").catch(() => null);
-    if (isOn === "false") await toggle.click();
-  }
-}
+// Step 8-10: open the Customers list, search the email, open the customer.
+// Returns the Stripe customer id parsed from the URL (cus_...).
+export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: string): Promise<string | null> {
+  await page.getByRole("link", { name: /^customers$/i }).first().click();
+  await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
-export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: string): Promise<void> {
-  await page.getByRole("link", { name: /customers/i }).first().click();
-  const search = page.getByPlaceholder(/search/i).first();
-  await search.click();
-  // Prefer the Email filter when available.
-  const emailFilter = page.getByText(/^email$/i).first();
-  if (await emailFilter.isVisible().catch(() => false)) await emailFilter.click();
+  const search = page.getByRole("searchbox", { name: /search by name, email/i }).first();
+  await search.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs });
   await search.fill(email);
-  await page.keyboard.press("Enter");
-  const result = page.getByRole("link", { name: new RegExp(email, "i") }).first();
-  if (await result.isVisible().catch(() => false)) {
-    await result.click();
-  } else {
+  // Wait for the result row containing the email to appear, then open it.
+  const customerLink = page.getByRole("link", { name: email }).first();
+  try {
+    await customerLink.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs });
+    await customerLink.click();
+  } catch {
     await promptEnterWhenReady(`Could not auto-open customer "${email}". Open it manually,`);
   }
+  await page.waitForURL(/\/customers\/cus_/, { timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   await shot(page, "customer-opened");
+  return page.url().match(/customers\/(cus_[A-Za-z0-9]+)/)?.[1] ?? null;
 }
 
+// Step 11: wait for the "Collection paused" indicator on the subscription.
 export async function waitForCollectionPaused(page: Page, cfg: AppConfig): Promise<boolean> {
   const tag = page.getByText(/collection paused/i).first();
   try {
@@ -114,77 +139,139 @@ export async function waitForCollectionPaused(page: Page, cfg: AppConfig): Promi
   }
 }
 
-export async function openPausedSubscription(page: Page): Promise<string | null> {
-  const sub = page.getByRole("link", { name: /sub_/ }).first();
+// Step 12: open the subscription from the customer page. Returns its sub_ id.
+export async function openPausedSubscription(page: Page, cfg: AppConfig): Promise<string | null> {
+  const link = page.locator('a[href*="/subscriptions/sub_"]').first();
   let id: string | null = null;
-  if (await sub.isVisible().catch(() => false)) {
-    id = (await sub.textContent())?.trim() ?? null;
-    await sub.click();
+  if (await link.isVisible().catch(() => false)) {
+    id = (await link.getAttribute("href"))?.match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
+    await link.click();
+    await page.waitForURL(/\/subscriptions\/sub_/, { timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   } else {
     await promptEnterWhenReady("Could not auto-open the paused subscription. Open it manually,");
+    id = page.url().match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
   }
   return id;
 }
 
-export async function runSimulation(page: Page): Promise<void> {
-  const btn = page.getByRole("button", { name: /run simulation/i }).first();
-  if (await btn.isVisible().catch(() => false)) {
-    await btn.click();
-  } else {
-    await promptEnterWhenReady("Could not find 'Run Simulation'. Click it manually,");
+// Step 13: open the Run simulation dialog (test clock). Returns the dialog locator.
+export async function runSimulation(page: Page, cfg: AppConfig): Promise<Locator> {
+  const dialog = page.getByRole("alertdialog", { name: /run simulation/i });
+  if (!(await dialog.isVisible().catch(() => false))) {
+    const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
+    if (await btn.isVisible().catch(() => false)) {
+      await btn.click();
+    } else {
+      await promptEnterWhenReady("Could not find 'Run simulation'. Open the simulation dialog manually,");
+    }
+    await dialog.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   }
   await shot(page, "simulation-started");
+  return dialog;
 }
 
-// Advance the test clock toward target. Loops until target reached.
+// Read the date currently selected in the dialog (e.g. "Jun 17, 2026").
+async function readSelectedDate(dialog: Locator): Promise<Date | null> {
+  const dateBtn = dialog.locator("button", { hasText: /\w{3}\s\d{1,2},\s\d{4}/ }).first();
+  const txt = await dateBtn.textContent().catch(() => null);
+  return txt ? parseHumanDate(txt) : null;
+}
+
+// Read the per-step cap from the note ("...advance the simulation time to <date>...").
+async function readCapDate(dialog: Locator): Promise<Date | null> {
+  const note = dialog.getByText(/advance the simulation time to/i).first();
+  const txt = await note.textContent().catch(() => null);
+  const m = txt?.match(/to\s+(.+?)(?:\s+at\b|\.|$)/i);
+  return m ? parseHumanDate(m[1]) : null;
+}
+
+// Nominal duration a preset button adds, used to pick the largest fitting preset.
+function presetCandidate(from: Date, label: string): Date {
+  const d = new Date(from.getTime());
+  if (label === "1 month") d.setUTCMonth(d.getUTCMonth() + 1);
+  else if (label === "1 week") d.setUTCDate(d.getUTCDate() + 7);
+  else if (label === "1 day") d.setUTCDate(d.getUTCDate() + 1);
+  else d.setUTCHours(d.getUTCHours() + 1);
+  return d;
+}
+
+// Steps 14-15: advance the test clock toward (current clock + span), looping
+// across the per-step cap, waiting for each advance to complete.
 export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: ParsedSpan): Promise<void> {
-  const target = addSpan(new Date(), span);
+  let dialog = await runSimulation(page, cfg);
+  const clockStart = (await readSelectedDate(dialog)) ?? new Date();
+  const target = addSpan(clockStart, span);
+
+  const presets = ["1 month", "1 week", "1 day", "1 hour"];
   let guard = 0;
-  while (guard++ < 60) {
-    const advanceBtn = page.getByRole("button", { name: /advance time/i }).first();
-    if (!(await advanceBtn.isVisible().catch(() => false))) {
-      await promptEnterWhenReady("Could not find 'Advance time'. Advance manually toward target,");
-      break;
+  while (guard++ < 80) {
+    let selected = (await readSelectedDate(dialog)) ?? clockStart;
+    const cap = (await readCapDate(dialog)) ?? target;
+    const stepTarget = target.getTime() < cap.getTime() ? target : cap;
+
+    // Click the largest preset whose result stays within this step's target.
+    let progressed = false;
+    let innerGuard = 0;
+    while (selected.getTime() < stepTarget.getTime() && innerGuard++ < 60) {
+      const label = presets.find((p) => presetCandidate(selected, p).getTime() <= stepTarget.getTime());
+      if (!label) break;
+      await dialog.getByRole("button", { name: new RegExp(`^${label}$`, "i") }).first().click();
+      await page.waitForTimeout(250);
+      const after = (await readSelectedDate(dialog)) ?? selected;
+      if (after.getTime() <= selected.getTime()) break; // no progress (hit cap)
+      selected = after;
+      progressed = true;
     }
-    await advanceBtn.click();
-    // Confirm dialog's advance button (if shown).
-    const confirm = page.getByRole("button", { name: /^advance( time)?$/i }).last();
-    if (await confirm.isVisible().catch(() => false)) await confirm.click();
+
+    if (!progressed) {
+      // Can't push further within the cap toward target; advance with one day as a fallback.
+      await dialog.getByRole("button", { name: /^1 day$/i }).first().click().catch(() => undefined);
+      await page.waitForTimeout(250);
+    }
+
+    await dialog.getByRole("button", { name: /^advance time$/i }).first().click();
+
     // Wait for the simulation to finish this step.
     await page
-      .getByText(/advancing|simulating|in progress/i)
+      .getByText(/the time of this test clock is advancing/i)
       .first()
       .waitFor({ state: "hidden", timeout: cfg.stripe.longTimeoutMs })
       .catch(() => undefined);
-    // Re-read the displayed clock time; stop when at/after target.
-    const clockText = await page.getByText(/\d{4}/).first().textContent().catch(() => null);
-    const current = clockText ? new Date(clockText) : null;
-    if (current && !Number.isNaN(current.getTime()) && current.getTime() >= target.getTime()) break;
-    // If Stripe doesn't expose a parseable clock, ask the user whether target is reached.
-    if (!current || Number.isNaN(current.getTime())) {
-      await promptEnterWhenReady(
-        `Confirm whether the test clock has reached ${target.toISOString()}. If yes, continue; if not, advance again manually then`,
-      );
-      break;
-    }
+    await page.waitForTimeout(1500);
+
+    const reachedDate = selected;
+    if (reachedDate.getTime() >= target.getTime()) break;
+
+    // Reopen the dialog for the next step (the cap will have moved forward).
+    dialog = await runSimulation(page, cfg);
   }
   await shot(page, "simulation-completed");
 }
 
+// Step 16: confirm an Active subscription for this customer from the refreshed
+// detail page. Returns confirmation + the active subscription id.
 export async function verifyActiveSubscriptionForEmail(
   page: Page,
   cfg: AppConfig,
+  customerId: string | null,
   email: string,
 ): Promise<{ confirmed: boolean; newSubscriptionId: string | null }> {
-  // Refresh / re-open customer to read fresh state from the detail page.
-  await page.reload({ waitUntil: "domcontentloaded" });
-  await openCustomerByEmail(page, cfg, email);
-  const active = page.getByText(/^active$/i).first();
-  const confirmed = await active.isVisible({ timeout: cfg.stripe.longTimeoutMs }).catch(() => false);
+  if (customerId) {
+    await page.goto(`${cfg.stripe.dashboardUrl}/test/customers/${customerId}`, { waitUntil: "domcontentloaded" });
+  } else {
+    await openCustomerByEmail(page, cfg, email);
+  }
+
+  const activeStatus = page.getByRole("link", { name: /^active$/i }).first();
+  const confirmed = await activeStatus
+    .isVisible({ timeout: cfg.stripe.longTimeoutMs })
+    .catch(() => false);
+
+  // The active subscription's id from its href on the (refreshed) customer page.
   let newSubscriptionId: string | null = null;
-  const sub = page.getByRole("link", { name: /sub_/ }).first();
-  if (await sub.isVisible().catch(() => false)) {
-    newSubscriptionId = (await sub.textContent())?.trim() ?? null;
+  const subLink = page.locator('a[href*="/subscriptions/sub_"]').first();
+  if (await subLink.isVisible().catch(() => false)) {
+    newSubscriptionId = (await subLink.getAttribute("href"))?.match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
   }
   if (confirmed) await shot(page, "active-subscription-confirmed");
   return { confirmed, newSubscriptionId };
@@ -201,33 +288,33 @@ export async function runStripeSimulation(
   try {
     await ensureLoggedIn(page, cfg);
     await ensureEnvironmentSelected(page, cfg);
-    await ensureSandboxMode(page);
-    await ensureTestModeEnabled(page);
-    await openCustomerByEmail(page, cfg, input.email);
+    await ensureTestMode(page);
+
+    const stripeCustomerId = await openCustomerByEmail(page, cfg, input.email);
+    if (input.expectedStripeCustomerId && stripeCustomerId &&
+        input.expectedStripeCustomerId !== stripeCustomerId) {
+      notes.push(`DB stripeCustomerId (${input.expectedStripeCustomerId}) != opened customer (${stripeCustomerId}).`);
+    }
 
     const collectionPausedSeen = await waitForCollectionPaused(page, cfg);
     if (!collectionPausedSeen) notes.push("Collection Paused tag was not observed.");
 
-    const oldStripeSubscriptionId = await openPausedSubscription(page);
-
+    const oldStripeSubscriptionId = await openPausedSubscription(page, cfg);
     if (input.expectedStripeSubscriptionId && oldStripeSubscriptionId &&
         input.expectedStripeSubscriptionId !== oldStripeSubscriptionId) {
       notes.push(
-        `DB stripeSubscriptionId (${input.expectedStripeSubscriptionId}) != paused Stripe sub (${oldStripeSubscriptionId}).`,
+        `DB subscriptionId (${input.expectedStripeSubscriptionId}) != opened subscription (${oldStripeSubscriptionId}).`,
       );
       await promptEnterWhenReady("DB/Stripe subscription id mismatch (see note). Verify this is the right subscription,");
     }
-
-    await runSimulation(page);
 
     const targetIso = addSpan(new Date(), input.span).toISOString();
     const proceed = await confirmAdvance({ targetIso });
     if (!proceed) {
       notes.push("User declined the ADVANCE confirmation; clock not advanced.");
-      await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) });
-      await context.close();
+      await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) }).catch(() => undefined);
       return {
-        stripeCustomerId: input.expectedStripeCustomerId,
+        stripeCustomerId,
         oldStripeSubscriptionId,
         newStripeSubscriptionId: null,
         collectionPausedSeen,
@@ -237,15 +324,16 @@ export async function runStripeSimulation(
     }
 
     await advanceClockBySpan(page, cfg, input.span);
-    const verify = await verifyActiveSubscriptionForEmail(page, cfg, input.email);
+
+    const verify = await verifyActiveSubscriptionForEmail(page, cfg, stripeCustomerId, input.email);
     if (verify.newSubscriptionId && oldStripeSubscriptionId &&
         verify.newSubscriptionId === oldStripeSubscriptionId) {
-      notes.push("New active subscription id equals old paused id — may not be a new subscription.");
+      notes.push("New active subscription id equals old paused id — may be the same subscription resumed.");
     }
 
-    await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) });
+    await context.tracing.stop({ path: join(ARTIFACTS, `trace-${Date.now()}.zip`) }).catch(() => undefined);
     return {
-      stripeCustomerId: input.expectedStripeCustomerId,
+      stripeCustomerId,
       oldStripeSubscriptionId,
       newStripeSubscriptionId: verify.newSubscriptionId,
       collectionPausedSeen,
@@ -254,7 +342,7 @@ export async function runStripeSimulation(
     };
   } catch (err) {
     notes.push(`Stripe flow error: ${err instanceof Error ? err.message : String(err)}`);
-    await shot(page, "failure").catch(() => undefined);
+    await shot(page, "failure");
     await context.tracing.stop({ path: join(ARTIFACTS, `trace-failure-${Date.now()}.zip`) }).catch(() => undefined);
     throw err;
   } finally {

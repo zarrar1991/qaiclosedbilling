@@ -3,3 +3,6 @@ dist/
 .env
 .auth/
 artifacts/
+
+# playwright-cli discovery artifacts
+.playwright-cli/
