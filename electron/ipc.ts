@@ -5,6 +5,8 @@ export type IpcResult<T> = { ok: true; data: T } | { ok: false; error: string };
 export interface SettingsValues { [key: string]: string }
 
 export interface RenewalCandidates { accountId: string; rows: SubscriptionRow[] }
+// Read-only search results: ALL subscriptions (incl. deleted) for the email.
+export interface SubscriptionSearchResult { accountId: string; email: string; rows: SubscriptionRow[] }
 export interface RenewalUpdateRequest { id?: string; accountId?: string; mode?: "all" }
 export interface RenewalUpdateResult { updated: SubscriptionRow[]; reselected: SubscriptionRow[] }
 
@@ -18,6 +20,7 @@ export const CH = {
   settingsSave: "settings:save",
   settingsTestDb: "settings:testDb",
   renewalGetCandidates: "renewal:getCandidates",
+  subscriptionsSearch: "subscriptions:search",
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",

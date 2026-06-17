@@ -6,7 +6,7 @@ import { createPool } from "../src/db.js";
 import { readEnv, writeEnv } from "../src/env-file.js";
 import { envPath, authProfileDir, bundledChromiumPath } from "./paths.js";
 import { CH, type IpcResult } from "./ipc.js";
-import { getRenewalCandidates, updateRenewalUi, runFullFlowUi } from "./runners.js";
+import { getRenewalCandidates, searchSubscriptionsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -46,6 +46,7 @@ ipcMain.handle(CH.settingsTestDb, () =>
   }),
 );
 ipcMain.handle(CH.renewalGetCandidates, (_e, email: string) => wrap(() => getRenewalCandidates(loadCfg(), email)));
+ipcMain.handle(CH.subscriptionsSearch, (_e, email: string) => wrap(() => searchSubscriptionsUi(loadCfg(), email)));
 ipcMain.handle(CH.renewalUpdate, (_e, req) => wrap(() => updateRenewalUi(loadCfg(), req)));
 ipcMain.handle(CH.fullflowRun, (e, req: { email: string; span: string }) =>
   wrap(() => runFullFlowUi(loadCfg(), req.email, req.span, (p) => e.sender.send(CH.fullflowProgress, p))),

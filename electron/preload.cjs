@@ -8,6 +8,7 @@ const CH = {
   settingsSave: "settings:save",
   settingsTestDb: "settings:testDb",
   renewalGetCandidates: "renewal:getCandidates",
+  subscriptionsSearch: "subscriptions:search",
   renewalUpdate: "renewal:update",
   fullflowRun: "fullflow:run",
   fullflowProgress: "fullflow:progress",
@@ -18,6 +19,7 @@ contextBridge.exposeInMainWorld("api", {
   saveSettings: (v) => ipcRenderer.invoke(CH.settingsSave, v),
   testDb: () => ipcRenderer.invoke(CH.settingsTestDb),
   getCandidates: (email) => ipcRenderer.invoke(CH.renewalGetCandidates, email),
+  searchSubscriptions: (email) => ipcRenderer.invoke(CH.subscriptionsSearch, email),
   updateRenewal: (req) => ipcRenderer.invoke(CH.renewalUpdate, req),
   runFullFlow: (req) => ipcRenderer.invoke(CH.fullflowRun, req),
   onProgress: (cb) => {

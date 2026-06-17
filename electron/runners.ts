@@ -1,9 +1,9 @@
 import type { AppConfig, RunReport } from "../src/types.js";
-import { createPool, lookupAccountId, fetchSubscriptions, updateRenewal, reselectByIds } from "../src/db.js";
+import { createPool, lookupAccountId, fetchSubscriptions, fetchAllSubscriptions, updateRenewal, reselectByIds } from "../src/db.js";
 import { chooseTargetSubscription } from "../src/selection.js";
 import { computeRenewalUTC, parseSpan } from "../src/time.js";
 import { runStripeSimulation } from "../src/stripe-flow.js";
-import type { RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, FullFlowProgress } from "./ipc.js";
+import type { RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, FullFlowProgress, SubscriptionSearchResult } from "./ipc.js";
 
 export async function getRenewalCandidates(cfg: AppConfig, email: string): Promise<RenewalCandidates> {
   const pool = createPool(cfg);
@@ -13,6 +13,19 @@ export async function getRenewalCandidates(cfg: AppConfig, email: string): Promi
     const rows = await fetchSubscriptions(pool, accountId); // deletedAt IS NULL only
     if (rows.length === 0) throw new Error("No active (non-deleted) subscription found.");
     return { accountId, rows };
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
+// Read-only search: ALL subscriptions (incl. deleted) for the email.
+export async function searchSubscriptionsUi(cfg: AppConfig, email: string): Promise<SubscriptionSearchResult> {
+  const pool = createPool(cfg);
+  try {
+    const accountId = await lookupAccountId(pool, email);
+    if (!accountId) throw new Error(`No account found for email ${email}`);
+    const rows = await fetchAllSubscriptions(pool, accountId);
+    return { accountId, email, rows };
   } finally {
     await pool.end().catch(() => undefined);
   }

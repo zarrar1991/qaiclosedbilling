@@ -62,6 +62,15 @@ export async function fetchSubscriptions(pool: pg.Pool, accountId: string): Prom
   return res.rows.map(mapRow);
 }
 
+// Like fetchSubscriptions but includes DELETED rows (deletedAt set) — used by the
+// read-only search/view table. Never used as an update target.
+export async function fetchAllSubscriptions(pool: pg.Pool, accountId: string): Promise<SubscriptionRow[]> {
+  const sql = `SELECT ${SUB_COLUMNS} FROM subscriptions WHERE "accountId" = $1 ORDER BY "createdAt" DESC;`;
+  logQuery(sql, [accountId]);
+  const res = await pool.query(sql, [accountId]);
+  return res.rows.map(mapRow);
+}
+
 // Transactional update. `target` is either a single id or "ALL" with accountId.
 export async function updateRenewal(
   pool: pg.Pool,
