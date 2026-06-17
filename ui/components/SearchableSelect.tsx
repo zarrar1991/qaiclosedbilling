@@ -50,34 +50,34 @@ export function SearchableSelect({
         type="button"
         disabled={disabled}
         onClick={toggle}
-        className="flex w-full items-center justify-between rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-left outline-none focus:border-sky-500 disabled:opacity-50"
+        className="ic-input flex items-center justify-between text-left disabled:cursor-default disabled:opacity-50"
       >
-        <span className={selectedLabel ? "text-slate-100" : "text-slate-500"}>
+        <span className={selectedLabel ? "text-ink" : "text-muted"}>
           {selectedLabel || placeholder}
         </span>
-        <span className="text-slate-500">▾</span>
+        <span className="text-[10px] text-muted">▼</span>
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+        <div className="absolute z-20 mt-1 w-full rounded-lg border border-line bg-white shadow-[0_12px_32px_rgba(16,24,40,.18)]">
           <div className="p-2">
             <input
               autoFocus
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search…"
-              className="w-full rounded-md border border-slate-700 bg-slate-950 px-2 py-1.5 text-sm outline-none focus:border-sky-500"
+              className="ic-input h-8 text-[12.5px]"
             />
           </div>
           <ul className="max-h-64 overflow-auto pb-1">
-            {loading && <li className="px-3 py-2 text-sm text-slate-400">Loading…</li>}
-            {!loading && filtered.length === 0 && <li className="px-3 py-2 text-sm text-slate-400">No matches</li>}
+            {loading && <li className="px-3 py-2 text-[12.5px] text-muted">Loading…</li>}
+            {!loading && filtered.length === 0 && <li className="px-3 py-2 text-[12.5px] text-muted">No matches</li>}
             {filtered.map((o) => (
               <li key={o.value}>
                 <button
                   type="button"
                   onClick={() => { onChange(o.value); setOpen(false); }}
-                  className={`block w-full px-3 py-2 text-left text-sm hover:bg-slate-800 ${o.value === value ? "bg-sky-500/15 text-sky-200" : "text-slate-200"}`}
+                  className={`block w-full px-3 py-2 text-left text-[12.5px] hover:bg-[#F4F6F9] ${o.value === value ? "bg-navy-tint font-semibold text-navy" : "text-strong"}`}
                 >
                   {o.label}
                 </button>
