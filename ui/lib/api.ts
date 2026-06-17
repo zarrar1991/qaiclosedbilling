@@ -22,5 +22,9 @@ interface Api {
   createIClosedUser(req: IClosedCreateRequest): Promise<IpcResult<IClosedResult>>;
   onIClosedProgress(cb: (p: IClosedProgress) => void): () => void;
   openExternal(url: string): Promise<IpcResult<boolean>>;
+  // Window controls (frameless custom title bar)
+  windowMinimize(): Promise<void>;
+  windowMaximize(): Promise<void>;
+  windowClose(): Promise<void>;
 }
 export const api = (window as unknown as { api: Api }).api;

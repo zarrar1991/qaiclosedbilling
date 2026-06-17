@@ -57,4 +57,7 @@ export const CH = {
   iclosedCreate: "iclosed:create",
   iclosedProgress: "iclosed:progress",
   openExternal: "shell:openExternal",
+  windowMinimize: "window:minimize",
+  windowMaximize: "window:maximize",
+  windowClose: "window:close",
 } as const;

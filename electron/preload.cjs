@@ -21,6 +21,9 @@ const CH = {
   iclosedCreate: "iclosed:create",
   iclosedProgress: "iclosed:progress",
   openExternal: "shell:openExternal",
+  windowMinimize: "window:minimize",
+  windowMaximize: "window:maximize",
+  windowClose: "window:close",
 };
 
 contextBridge.exposeInMainWorld("api", {
@@ -52,4 +55,8 @@ contextBridge.exposeInMainWorld("api", {
     return () => ipcRenderer.removeListener(CH.iclosedProgress, listener);
   },
   openExternal: (url) => ipcRenderer.invoke(CH.openExternal, url),
+  // Window controls (frameless custom title bar)
+  windowMinimize: () => ipcRenderer.invoke(CH.windowMinimize),
+  windowMaximize: () => ipcRenderer.invoke(CH.windowMaximize),
+  windowClose: () => ipcRenderer.invoke(CH.windowClose),
 });

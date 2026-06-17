@@ -133,12 +133,22 @@ async function wrap<T>(fn: () => Promise<T>): Promise<IpcResult<T>> {
 
 function createWindow(): void {
   const win = new BrowserWindow({
-    width: 1440, height: 900, backgroundColor: "#0b1020",
+    width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: "#F8FAFC",
+    frame: false, // frameless: the renderer draws its own title bar (see ui/components/TitleBar.tsx)
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   if (app.isPackaged) win.loadFile(join(__dirname, "../dist-ui/index.html"));
   else win.loadURL(process.env.VITE_DEV_SERVER_URL ?? "http://localhost:5173");
 }
+
+// --- Window controls (frameless custom title bar) ---
+ipcMain.handle(CH.windowMinimize, (e) => { BrowserWindow.fromWebContents(e.sender)?.minimize(); });
+ipcMain.handle(CH.windowMaximize, (e) => {
+  const w = BrowserWindow.fromWebContents(e.sender);
+  if (!w) return;
+  if (w.isMaximized()) w.unmaximize(); else w.maximize();
+});
+ipcMain.handle(CH.windowClose, (e) => { BrowserWindow.fromWebContents(e.sender)?.close(); });
 
 // --- Profile management ---
 ipcMain.handle(CH.profilesList, () => wrap(async () => listProfiles()));
