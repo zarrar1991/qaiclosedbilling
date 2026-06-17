@@ -248,31 +248,55 @@ export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: Parse
   await shot(page, "simulation-completed");
 }
 
-// Step 16: confirm an Active subscription for this customer from the refreshed
-// detail page. Returns confirmation + the active subscription id.
+// Step 16: confirm the downgrade succeeded. On the customer's page there must
+// be a subscription row that is Active, has NO "Collection paused" tag, and is a
+// DIFFERENT subscription from the old paused one. Polls (with reloads) until it
+// appears or the long timeout elapses.
 export async function verifyActiveSubscriptionForEmail(
   page: Page,
   cfg: AppConfig,
   customerId: string | null,
   email: string,
+  oldSubscriptionId: string | null,
 ): Promise<{ confirmed: boolean; newSubscriptionId: string | null }> {
-  if (customerId) {
-    await page.goto(`${cfg.stripe.dashboardUrl}/test/customers/${customerId}`, { waitUntil: "domcontentloaded" });
-  } else {
-    await openCustomerByEmail(page, cfg, email);
-  }
+  const customerUrl = customerId ? `${cfg.stripe.dashboardUrl}/test/customers/${customerId}` : null;
+  const deadline = Date.now() + cfg.stripe.longTimeoutMs;
 
-  const activeStatus = page.getByRole("link", { name: /^active$/i }).first();
-  const confirmed = await activeStatus
-    .isVisible({ timeout: cfg.stripe.longTimeoutMs })
-    .catch(() => false);
-
-  // The active subscription's id from its href on the (refreshed) customer page.
   let newSubscriptionId: string | null = null;
-  const subLink = page.locator('a[href*="/subscriptions/sub_"]').first();
-  if (await subLink.isVisible().catch(() => false)) {
-    newSubscriptionId = (await subLink.getAttribute("href"))?.match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
+  let confirmed = false;
+
+  while (Date.now() < deadline) {
+    if (customerUrl) {
+      await page.goto(customerUrl, { waitUntil: "domcontentloaded" });
+    } else {
+      await openCustomerByEmail(page, cfg, email);
+    }
+    await page.waitForTimeout(1500);
+
+    // Each subscription is a table row containing a /subscriptions/sub_ link.
+    const rows = page.getByRole("row").filter({ has: page.locator('a[href*="/subscriptions/sub_"]') });
+    const count = await rows.count().catch(() => 0);
+    for (let i = 0; i < count; i++) {
+      const row = rows.nth(i);
+      const text = (await row.innerText().catch(() => "")) ?? "";
+      const href = await row
+        .locator('a[href*="/subscriptions/sub_"]')
+        .first()
+        .getAttribute("href")
+        .catch(() => null);
+      const id = href?.match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
+      const isActive = /\bactive\b/i.test(text);
+      const isPaused = /collection paused/i.test(text);
+      if (isActive && !isPaused && id && id !== oldSubscriptionId) {
+        confirmed = true;
+        newSubscriptionId = id;
+        break;
+      }
+    }
+    if (confirmed) break;
+    await page.waitForTimeout(5000);
   }
+
   if (confirmed) await shot(page, "active-subscription-confirmed");
   return { confirmed, newSubscriptionId };
 }
@@ -325,7 +349,13 @@ export async function runStripeSimulation(
 
     await advanceClockBySpan(page, cfg, input.span);
 
-    const verify = await verifyActiveSubscriptionForEmail(page, cfg, stripeCustomerId, input.email);
+    const verify = await verifyActiveSubscriptionForEmail(
+      page,
+      cfg,
+      stripeCustomerId,
+      input.email,
+      oldStripeSubscriptionId,
+    );
     if (verify.newSubscriptionId && oldStripeSubscriptionId &&
         verify.newSubscriptionId === oldStripeSubscriptionId) {
       notes.push("New active subscription id equals old paused id — may be the same subscription resumed.");
