@@ -149,7 +149,7 @@ export function CreateUser({ profile }: { profile: string }) {
 
   return (
     <div className="max-w-2xl space-y-5">
-      <h1 className="text-2xl font-bold">Create iClosed user</h1>
+      <h1 className="text-2xl font-bold">Create user</h1>
 
       <label className="block max-w-md">
         <span className="mb-1 block text-sm text-slate-400">Campaign</span>

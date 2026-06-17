@@ -35,7 +35,7 @@ export function FullDowngrade({ profile }: { profile: string }) {
 
   return (
     <div className="max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">Run full downgrade</h1>
+      <h1 className="text-2xl font-bold">Downgrade</h1>
       <div className="max-w-md">
         <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
       </div>
@@ -62,7 +62,7 @@ export function FullDowngrade({ profile }: { profile: string }) {
       </div>
       <button disabled={busy || !email || !profile} onClick={run}
         className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
-        {busy ? "Running…" : "Run downgrade"}
+        {busy ? "Running…" : "Downgrade"}
       </button>
       {steps.length > 0 && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
