@@ -155,12 +155,14 @@ export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: str
 export async function waitForCollectionPaused(page: Page, cfg: AppConfig): Promise<boolean> {
   const deadline = Date.now() + cfg.stripe.longTimeoutMs;
   while (Date.now() < deadline) {
+    // Give the (re)loaded customer page time to render its subscription rows,
+    // THEN check the badge — i.e. verify the tag after every refresh.
+    await page.waitForTimeout(15000);
     const seen = await page.getByText(/collection paused/i).first().isVisible().catch(() => false);
     if (seen) {
       await shot(page, "collection-paused-found");
       return true;
     }
-    await page.waitForTimeout(6000);
     await page.reload({ waitUntil: "domcontentloaded" }).catch(() => undefined);
   }
   await shot(page, "collection-paused-missing");
@@ -321,8 +323,8 @@ export async function verifyActiveSubscriptionForEmail(
     } else {
       await openCustomerByEmail(page, cfg, email);
     }
-    // The customer page's subscription rows render async (~6s); wait before reading.
-    await page.waitForTimeout(6000);
+    // The customer page's subscription rows render async; wait before reading.
+    await page.waitForTimeout(10000);
 
     // Each subscription is a table row containing a /subscriptions/sub_ link.
     const rows = page.getByRole("row").filter({ has: page.locator('a[href*="/subscriptions/sub_"]') });
