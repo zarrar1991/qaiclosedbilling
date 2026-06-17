@@ -30,24 +30,26 @@ function generatePassword(length = 12): string {
 
 type RunState = "idle" | "running" | "success" | "error";
 
-const CAMPAIGN_URL_KEY = "iclosed.campaignUrl";
+const FORM_KEY = "iclosed.createUser";
+const savedForm: Record<string, unknown> = (() => {
+  try { return JSON.parse(localStorage.getItem(FORM_KEY) || "{}"); } catch { return {}; }
+})();
 
 export function CreateUser({ profile }: { profile: string }) {
-  // Persist the campaign URL across runs/restarts so it isn't re-entered each time.
-  const [campaignUrl, setCampaignUrl] = useState(() => localStorage.getItem(CAMPAIGN_URL_KEY) ?? "");
-  useEffect(() => { localStorage.setItem(CAMPAIGN_URL_KEY, campaignUrl); }, [campaignUrl]);
+  // All form selections persist across runs/restarts.
+  const [campaignUrl, setCampaignUrl] = useState((savedForm.campaignUrl as string) ?? "");
 
   // Campaigns dropdown — lazy: fetched fresh each time it's opened.
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loadingCampaigns, setLoadingCampaigns] = useState(false);
   const [campaignsError, setCampaignsError] = useState<string | null>(null);
-  const [selectedCampaign, setSelectedCampaign] = useState(""); // campaign id (as string)
+  const [selectedCampaign, setSelectedCampaign] = useState((savedForm.selectedCampaign as string) ?? ""); // campaign id
 
   // Campaign Link dropdown — fetched from the back-office API for the selected campaign.
   const [links, setLinks] = useState<CampaignLink[]>([]);
   const [loadingLinks, setLoadingLinks] = useState(false);
   const [linksError, setLinksError] = useState<string | null>(null);
-  const [selectedLink, setSelectedLink] = useState(""); // hash
+  const [selectedLink, setSelectedLink] = useState((savedForm.selectedLink as string) ?? ""); // hash
 
   async function loadCampaigns() {
     setLoadingCampaigns(true); setCampaignsError(null);
@@ -70,8 +72,13 @@ export function CreateUser({ profile }: { profile: string }) {
     if (r.data.length > 0 && !selectedLink) onPickLink(r.data[0].hash, !campaignUrl);
   }
 
-  // Initial load so the latest campaign is selected by default; re-fetched on open.
-  useEffect(() => { loadCampaigns(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [profile]);
+  // Initial load: populate campaigns; if a campaign was previously selected, also
+  // load its links so the saved Campaign Link shows. Otherwise default to latest.
+  useEffect(() => {
+    loadCampaigns();
+    if (selectedCampaign) loadLinks(selectedCampaign);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps */
+  }, [profile]);
 
   function onPickCampaign(id: string) {
     setSelectedCampaign(id);
@@ -83,11 +90,18 @@ export function CreateUser({ profile }: { profile: string }) {
     setSelectedLink(hash);
     if (hash && setUrl) setCampaignUrl(campaignUrlFor(hash));
   }
-  const [emailMode, setEmailMode] = useState<"random" | "custom">("random");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("Demo@123");
-  const [headless, setHeadless] = useState(true);
-  const [closeWhenDone, setCloseWhenDone] = useState(false);
+  const [emailMode, setEmailMode] = useState<"random" | "custom">((savedForm.emailMode as "random" | "custom") ?? "random");
+  const [email, setEmail] = useState((savedForm.email as string) ?? "");
+  const [password, setPassword] = useState((savedForm.password as string) ?? "Demo@123");
+  const [headless, setHeadless] = useState(savedForm.headless != null ? Boolean(savedForm.headless) : true);
+  const [closeWhenDone, setCloseWhenDone] = useState(Boolean(savedForm.closeWhenDone));
+
+  // Persist all selections/inputs whenever they change.
+  useEffect(() => {
+    localStorage.setItem(FORM_KEY, JSON.stringify({
+      campaignUrl, selectedCampaign, selectedLink, emailMode, email, password, headless, closeWhenDone,
+    }));
+  }, [campaignUrl, selectedCampaign, selectedLink, emailMode, email, password, headless, closeWhenDone]);
 
   const [state, setState] = useState<RunState>("idle");
   const [steps, setSteps] = useState<Step[]>([]);
