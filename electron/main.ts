@@ -3,21 +3,30 @@ import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { parseConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
-import { readEnv, writeEnv } from "../src/env-file.js";
-import { envPath, authProfileDir, bundledChromiumPath } from "./paths.js";
-import { CH, type IpcResult } from "./ipc.js";
+import { readProfiles, writeProfiles } from "../src/profiles.js";
+import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
+import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList } from "./ipc.js";
 import { getRenewalCandidates, searchSubscriptionsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-function loadCfg(): AppConfig {
-  const env = readEnv(envPath());
-  const cfg = parseConfig(env);
+// Build config from a named profile (or the active one). All profiles share the
+// single .auth Stripe login.
+function loadCfg(profileName?: string): AppConfig {
+  const file = readProfiles(profilesPath(), envPath());
+  const name = profileName || file.activeProfile;
+  const values = file.profiles[name] ?? {};
+  const cfg = parseConfig(values);
   cfg.stripe.authProfileDir = authProfileDir();
   const chromium = bundledChromiumPath();
   if (chromium) process.env.PLAYWRIGHT_BROWSERS_PATH = chromium;
   return cfg;
+}
+
+function listProfiles(): ProfilesList {
+  const f = readProfiles(profilesPath(), envPath());
+  return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
 }
 
 async function wrap<T>(fn: () => Promise<T>): Promise<IpcResult<T>> {
@@ -34,22 +43,57 @@ function createWindow(): void {
   else win.loadURL(process.env.VITE_DEV_SERVER_URL ?? "http://localhost:5173");
 }
 
-ipcMain.handle(CH.settingsLoad, () => wrap(async () => readEnv(envPath())));
-ipcMain.handle(CH.settingsSave, (_e, v: Record<string, string>) =>
-  wrap(async () => { writeEnv(envPath(), v); return readEnv(envPath()); }),
+// --- Profile management ---
+ipcMain.handle(CH.profilesList, () => wrap(async () => listProfiles()));
+ipcMain.handle(CH.profilesGet, (_e, name: string) =>
+  wrap(async () => readProfiles(profilesPath(), envPath()).profiles[name] ?? {}),
 );
-ipcMain.handle(CH.settingsTestDb, () =>
+ipcMain.handle(CH.profilesSave, (_e, payload: { name: string; values: Record<string, string> }) =>
   wrap(async () => {
-    const pool = createPool(loadCfg());
+    const f = readProfiles(profilesPath(), envPath());
+    f.profiles[payload.name] = payload.values;
+    if (!(f.activeProfile in f.profiles)) f.activeProfile = payload.name;
+    writeProfiles(profilesPath(), f);
+    return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
+  }),
+);
+ipcMain.handle(CH.profilesDelete, (_e, name: string) =>
+  wrap(async () => {
+    const f = readProfiles(profilesPath(), envPath());
+    delete f.profiles[name];
+    if (Object.keys(f.profiles).length === 0) f.profiles["Default"] = {};
+    if (!(f.activeProfile in f.profiles)) f.activeProfile = Object.keys(f.profiles)[0];
+    writeProfiles(profilesPath(), f);
+    return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
+  }),
+);
+ipcMain.handle(CH.profilesSetActive, (_e, name: string) =>
+  wrap(async () => {
+    const f = readProfiles(profilesPath(), envPath());
+    if (name in f.profiles) { f.activeProfile = name; writeProfiles(profilesPath(), f); }
+    return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
+  }),
+);
+
+// --- Operations (all take a profile name) ---
+ipcMain.handle(CH.settingsTestDb, (_e, profile: string) =>
+  wrap(async () => {
+    const pool = createPool(loadCfg(profile));
     try { await pool.query("SELECT 1"); return { connected: true }; }
     finally { await pool.end().catch(() => undefined); }
   }),
 );
-ipcMain.handle(CH.renewalGetCandidates, (_e, email: string) => wrap(() => getRenewalCandidates(loadCfg(), email)));
-ipcMain.handle(CH.subscriptionsSearch, (_e, email: string) => wrap(() => searchSubscriptionsUi(loadCfg(), email)));
-ipcMain.handle(CH.renewalUpdate, (_e, req) => wrap(() => updateRenewalUi(loadCfg(), req)));
-ipcMain.handle(CH.fullflowRun, (e, req: { email: string; span: string }) =>
-  wrap(() => runFullFlowUi(loadCfg(), req.email, req.span, (p) => e.sender.send(CH.fullflowProgress, p))),
+ipcMain.handle(CH.renewalGetCandidates, (_e, p: { profile: string; email: string }) =>
+  wrap(() => getRenewalCandidates(loadCfg(p.profile), p.email)),
+);
+ipcMain.handle(CH.subscriptionsSearch, (_e, p: { profile: string; email: string }) =>
+  wrap(() => searchSubscriptionsUi(loadCfg(p.profile), p.email)),
+);
+ipcMain.handle(CH.renewalUpdate, (_e, p: { profile: string; req: RenewalUpdateRequest }) =>
+  wrap(() => updateRenewalUi(loadCfg(p.profile), p.req)),
+);
+ipcMain.handle(CH.fullflowRun, (e, p: { profile: string; email: string; span: string }) =>
+  wrap(() => runFullFlowUi(loadCfg(p.profile), p.email, p.span, (pr) => e.sender.send(CH.fullflowProgress, pr))),
 );
 
 app.whenReady().then(createWindow);

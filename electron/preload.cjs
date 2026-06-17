@@ -4,8 +4,11 @@
 const { contextBridge, ipcRenderer } = require("electron");
 
 const CH = {
-  settingsLoad: "settings:load",
-  settingsSave: "settings:save",
+  profilesList: "profiles:list",
+  profilesGet: "profiles:get",
+  profilesSave: "profiles:save",
+  profilesDelete: "profiles:delete",
+  profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",
@@ -15,13 +18,18 @@ const CH = {
 };
 
 contextBridge.exposeInMainWorld("api", {
-  loadSettings: () => ipcRenderer.invoke(CH.settingsLoad),
-  saveSettings: (v) => ipcRenderer.invoke(CH.settingsSave, v),
-  testDb: () => ipcRenderer.invoke(CH.settingsTestDb),
-  getCandidates: (email) => ipcRenderer.invoke(CH.renewalGetCandidates, email),
-  searchSubscriptions: (email) => ipcRenderer.invoke(CH.subscriptionsSearch, email),
-  updateRenewal: (req) => ipcRenderer.invoke(CH.renewalUpdate, req),
-  runFullFlow: (req) => ipcRenderer.invoke(CH.fullflowRun, req),
+  // Profiles
+  loadProfiles: () => ipcRenderer.invoke(CH.profilesList),
+  getProfile: (name) => ipcRenderer.invoke(CH.profilesGet, name),
+  saveProfile: (name, values) => ipcRenderer.invoke(CH.profilesSave, { name, values }),
+  deleteProfile: (name) => ipcRenderer.invoke(CH.profilesDelete, name),
+  setActiveProfile: (name) => ipcRenderer.invoke(CH.profilesSetActive, name),
+  // Operations (each takes the selected profile name)
+  testDb: (profile) => ipcRenderer.invoke(CH.settingsTestDb, profile),
+  getCandidates: (profile, email) => ipcRenderer.invoke(CH.renewalGetCandidates, { profile, email }),
+  searchSubscriptions: (profile, email) => ipcRenderer.invoke(CH.subscriptionsSearch, { profile, email }),
+  updateRenewal: (profile, req) => ipcRenderer.invoke(CH.renewalUpdate, { profile, req }),
+  runFullFlow: (profile, req) => ipcRenderer.invoke(CH.fullflowRun, { profile, email: req.email, span: req.span }),
   onProgress: (cb) => {
     const listener = (_e, p) => cb(p);
     ipcRenderer.on(CH.fullflowProgress, listener);

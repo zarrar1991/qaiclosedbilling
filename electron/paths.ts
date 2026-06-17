@@ -11,6 +11,11 @@ export function authProfileDir(): string {
   return app.isPackaged ? join(app.getPath("userData"), ".auth") : join(process.cwd(), ".auth");
 }
 
+// Named credential profiles file (shared across profiles; one Stripe login).
+export function profilesPath(): string {
+  return app.isPackaged ? join(app.getPath("userData"), "profiles.json") : join(process.cwd(), "profiles.json");
+}
+
 // When packaged, point Playwright at the bundled Chromium (set in packaging task).
 // In dev, return undefined so Playwright uses its normally-installed browser.
 export function bundledChromiumPath(): string | undefined {

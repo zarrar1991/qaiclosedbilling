@@ -8,24 +8,99 @@ const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_
   "STRIPE_STEP_TIMEOUT_MS", "STRIPE_LONG_TIMEOUT_MS", "DEFAULT_RENEWAL_OFFSET_MINUTES", "PLAYWRIGHT_SLOW_MO_MS"];
 
 export function Settings() {
+  const [names, setNames] = useState<string[]>([]);
+  const [active, setActive] = useState<string>("");
+  const [selected, setSelected] = useState<string>("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
-  useEffect(() => { api.loadSettings().then((r) => { if (r.ok) setVals(r.data); }); }, []);
+  async function loadProfile(name: string) {
+    if (!name) { setVals({}); return; }
+    const r = await api.getProfile(name);
+    if (r.ok) setVals(r.data);
+  }
+
+  async function refreshList(selectName?: string) {
+    const r = await api.loadProfiles();
+    if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+    setNames(r.data.names);
+    setActive(r.data.activeProfile);
+    const pick = selectName ?? r.data.activeProfile;
+    setSelected(pick);
+    await loadProfile(pick);
+  }
+
+  useEffect(() => { refreshList(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, []);
+
   const set = (k: string) => (v: string) => setVals((s) => ({ ...s, [k]: v }));
 
-  async function save() {
-    const r = await api.saveSettings(vals);
-    setMsg(r.ok ? { ok: true, text: "Settings saved to .env" } : { ok: false, text: r.error });
+  async function onSelect(name: string) {
+    setSelected(name);
+    setMsg(null);
+    await loadProfile(name);
   }
+
+  async function save() {
+    if (!selected) return;
+    const r = await api.saveProfile(selected, vals);
+    if (r.ok) { setNames(r.data.names); setActive(r.data.activeProfile); }
+    setMsg(r.ok ? { ok: true, text: `Profile "${selected}" saved` } : { ok: false, text: r.error });
+  }
+
   async function test() {
-    const r = await api.testDb();
-    setMsg(r.ok ? { ok: true, text: "Database connection OK" } : { ok: false, text: r.error });
+    const r = await api.testDb(selected);
+    setMsg(r.ok ? { ok: true, text: `Database connection OK (${selected})` } : { ok: false, text: r.error });
+  }
+
+  async function newProfile() {
+    const name = window.prompt("New profile name (e.g. Stage, Prod):")?.trim();
+    if (!name) return;
+    if (names.includes(name)) { setMsg({ ok: false, text: `Profile "${name}" already exists` }); return; }
+    const r = await api.saveProfile(name, {});
+    if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+    await refreshList(name);
+    setMsg({ ok: true, text: `Profile "${name}" created — fill in its values and Save` });
+  }
+
+  async function deleteProfile() {
+    if (!selected) return;
+    if (!window.confirm(`Delete profile "${selected}"?`)) return;
+    const r = await api.deleteProfile(selected);
+    if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+    setNames(r.data.names);
+    setActive(r.data.activeProfile);
+    const next = r.data.names[0] ?? "";
+    setSelected(next);
+    await loadProfile(next);
+    setMsg({ ok: true, text: "Profile deleted" });
+  }
+
+  async function makeActive() {
+    if (!selected) return;
+    const r = await api.setActiveProfile(selected);
+    if (r.ok) { setActive(r.data.activeProfile); setMsg({ ok: true, text: `"${selected}" is now the default profile` }); }
   }
 
   return (
     <div className="max-w-2xl space-y-6">
       <h1 className="text-2xl font-bold">Settings</h1>
+
+      <section className="space-y-3 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <h2 className="text-sm font-semibold uppercase text-slate-400">Profile</h2>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="block">
+            <span className="mb-1 block text-sm text-slate-400">Editing profile</span>
+            <select value={selected} onChange={(e) => onSelect(e.target.value)}
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+              {names.map((n) => <option key={n} value={n}>{n}{n === active ? " (default)" : ""}</option>)}
+            </select>
+          </label>
+          <button onClick={newProfile} className="rounded-lg border border-slate-700 px-3 py-2 hover:bg-slate-800">New profile</button>
+          <button onClick={makeActive} disabled={!selected} className="rounded-lg border border-slate-700 px-3 py-2 hover:bg-slate-800 disabled:opacity-50">Set as default</button>
+          <button onClick={deleteProfile} disabled={!selected} className="rounded-lg border border-rose-700/60 px-3 py-2 text-rose-300 hover:bg-rose-900/30 disabled:opacity-50">Delete</button>
+        </div>
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-sm font-semibold uppercase text-slate-400">Database</h2>
         {DB_KEYS.map((k) => <Field key={k} label={k} type={k === "PGPASSWORD" ? "password" : "text"} value={vals[k] ?? ""} onChange={set(k)} />)}
@@ -35,8 +110,8 @@ export function Settings() {
         {STRIPE_KEYS.map((k) => <Field key={k} label={k} value={vals[k] ?? ""} onChange={set(k)} />)}
       </section>
       <div className="flex gap-3">
-        <button onClick={save} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold">Save</button>
-        <button onClick={test} className="rounded-lg border border-slate-700 px-4 py-2">Test DB connection</button>
+        <button onClick={save} disabled={!selected} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">Save</button>
+        <button onClick={test} disabled={!selected} className="rounded-lg border border-slate-700 px-4 py-2 disabled:opacity-50">Test DB connection</button>
       </div>
       {msg && <Banner kind={msg.ok ? "success" : "error"} title={msg.ok ? "OK" : "Error"}>{msg.text}</Banner>}
     </div>

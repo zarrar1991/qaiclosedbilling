@@ -15,9 +15,15 @@ export interface FullFlowProgress { step: string; message: string }
 
 export interface DbCheckResult { table: string; ok: boolean; columns: { name: string; present: boolean }[] }
 
+// Profile management: list of profile names + which is the default/active.
+export interface ProfilesList { activeProfile: string; names: string[] }
+
 export const CH = {
-  settingsLoad: "settings:load",
-  settingsSave: "settings:save",
+  profilesList: "profiles:list",
+  profilesGet: "profiles:get",
+  profilesSave: "profiles:save",
+  profilesDelete: "profiles:delete",
+  profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",

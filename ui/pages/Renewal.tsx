@@ -4,9 +4,11 @@ import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { SubscriptionPicker } from "../components/SubscriptionPicker.js";
 import { SubscriptionsTable } from "../components/SubscriptionsTable.js";
+import { ProfileSelect } from "../components/ProfileSelect.js";
 import type { SubscriptionRow } from "../../src/types.js";
 
 export function Renewal() {
+  const [profile, setProfile] = useState("");
   const [email, setEmail] = useState("");
   const [rows, setRows] = useState<SubscriptionRow[] | null>(null); // update picker rows
   const [accountId, setAccountId] = useState<string | null>(null);
@@ -21,7 +23,7 @@ export function Renewal() {
   async function runSearch() {
     if (!email) return;
     setSearching(true); setSearchError(null);
-    const res = await api.searchSubscriptions(email);
+    const res = await api.searchSubscriptions(profile, email);
     setSearching(false);
     if (!res.ok) { setSearchError(res.error); setSearchRows(null); return; }
     setSearchRows(res.data.rows);
@@ -29,7 +31,7 @@ export function Renewal() {
 
   async function start() {
     setResult(null); setRows(null); setBusy(true);
-    const res = await api.getCandidates(email);
+    const res = await api.getCandidates(profile, email);
     setBusy(false);
     if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
     setAccountId(res.data.accountId);
@@ -41,7 +43,7 @@ export function Renewal() {
   // on the single-subscription path; fall back to state for the picker path.
   async function doUpdate(id: string, acct?: string) {
     setBusy(true); setRows(null);
-    const res = await api.updateRenewal({ id });
+    const res = await api.updateRenewal(profile, { id });
     setBusy(false);
     if (!res.ok) { setResult({ ok: false, msg: res.error }); return; }
     const r = res.data.reselected[0];
@@ -50,13 +52,16 @@ export function Renewal() {
     await runSearch();
   }
 
-  const disabled = busy || searching || !email;
+  const disabled = busy || searching || !email || !profile;
 
   return (
     <div className="max-w-4xl space-y-6">
       <h1 className="text-2xl font-bold">Renewal Date Updater</h1>
-      <div className="max-w-md">
-        <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
+      <div className="flex flex-wrap items-end gap-3">
+        <ProfileSelect value={profile} onChange={setProfile} />
+        <div className="w-full max-w-md">
+          <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
+        </div>
       </div>
       <div className="flex items-center gap-3">
         <button disabled={disabled} onClick={start}

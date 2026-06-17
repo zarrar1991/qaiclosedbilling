@@ -3,11 +3,13 @@ import { api } from "../lib/api.js";
 import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
+import { ProfileSelect } from "../components/ProfileSelect.js";
 import type { RunReport } from "../../src/types.js";
 
 const PRESETS = ["1 day", "1 week", "1 month", "1 year", "Custom"] as const;
 
 export function FullDowngrade() {
+  const [profile, setProfile] = useState("");
   const [email, setEmail] = useState("");
   const [preset, setPreset] = useState<(typeof PRESETS)[number]>("1 month");
   const [amount, setAmount] = useState("1");
@@ -27,7 +29,7 @@ export function FullDowngrade() {
 
   async function run() {
     setSteps([]); setReport(null); setError(null); setBusy(true);
-    const res = await api.runFullFlow({ email, span: span() });
+    const res = await api.runFullFlow(profile, { email, span: span() });
     setBusy(false);
     if (!res.ok) { setError(res.error); return; }
     setReport(res.data);
@@ -36,7 +38,12 @@ export function FullDowngrade() {
   return (
     <div className="max-w-2xl space-y-4">
       <h1 className="text-2xl font-bold">Run full downgrade</h1>
-      <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
+      <div className="flex flex-wrap items-end gap-3">
+        <ProfileSelect value={profile} onChange={setProfile} />
+        <div className="w-full max-w-md">
+          <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
+        </div>
+      </div>
       <div className="flex gap-3">
         <label className="block">
           <span className="mb-1 block text-sm text-slate-400">Advance interval</span>
@@ -58,7 +65,7 @@ export function FullDowngrade() {
           </>
         )}
       </div>
-      <button disabled={busy || !email} onClick={run}
+      <button disabled={busy || !email || !profile} onClick={run}
         className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
         {busy ? "Running…" : "Run downgrade"}
       </button>

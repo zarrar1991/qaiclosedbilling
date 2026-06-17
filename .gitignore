@@ -1,6 +1,9 @@
 node_modules/
 dist/
+dist-ui/
+dist-electron/
 .env
+profiles.json
 .auth/
 artifacts/
 
