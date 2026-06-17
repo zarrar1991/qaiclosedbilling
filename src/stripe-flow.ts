@@ -231,13 +231,11 @@ export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: Parse
 
     await dialog.getByRole("button", { name: /^advance time$/i }).first().click();
 
-    // Wait for the simulation to finish this step.
-    await page
-      .getByText(/the time of this test clock is advancing/i)
-      .first()
-      .waitFor({ state: "hidden", timeout: cfg.stripe.longTimeoutMs })
-      .catch(() => undefined);
-    await page.waitForTimeout(1500);
+    // The dialog closes once the advance is submitted; then the test clock
+    // processes the step server-side. (The "test clock is advancing" panel text
+    // is a static heading, not a progress indicator, so we don't wait on it.)
+    await dialog.waitFor({ state: "hidden", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+    await page.waitForTimeout(8000);
 
     const reachedDate = selected;
     if (reachedDate.getTime() >= target.getTime()) break;
