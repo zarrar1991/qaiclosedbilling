@@ -177,35 +177,46 @@ export async function openPausedSubscription(page: Page, cfg: AppConfig, hooks: 
   return id;
 }
 
-// Step 13: open the Run simulation dialog (test clock). Returns the dialog locator.
-export async function runSimulation(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<Locator> {
-  const dialog = page.getByRole("alertdialog", { name: /run simulation/i });
-  if (!(await dialog.isVisible().catch(() => false))) {
-    const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
-    // The subscription detail page (and its test-clock panel) renders async after
-    // navigation, so wait for the button before deciding it's missing.
-    await btn.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
-    if (await btn.isVisible().catch(() => false)) {
-      await btn.click();
-    } else {
-      await manualStep("Could not find 'Run simulation'. Open the simulation dialog manually,", hooks);
-    }
-    await dialog.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+// Step 13: open the Run simulation modal (test clock).
+// NOTE: Stripe renders the modal's controls (date, presets, "Advance time")
+// OUTSIDE the [role=alertdialog] DOM node, so they are NOT descendants of the
+// dialog locator. All modal controls below are therefore PAGE-scoped, not
+// dialog-scoped (dialog-scoped lookups match nothing and hang).
+export async function runSimulation(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
+  // The modal's date button (e.g. "Tue, Aug 18, 2026") is the reliable signal
+  // that the modal is open.
+  if (await modalDateButton(page).isVisible().catch(() => false)) {
+    await shot(page, "simulation-started");
+    return;
   }
+  const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
+  // The subscription detail page (and its test-clock panel) renders async after
+  // navigation, so wait for the button before deciding it's missing.
+  await btn.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+  if (await btn.isVisible().catch(() => false)) {
+    await btn.click();
+  } else {
+    await manualStep("Could not find 'Run simulation'. Open the simulation dialog manually,", hooks);
+  }
+  await modalDateButton(page).waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   await shot(page, "simulation-started");
-  return dialog;
 }
 
-// Read the date currently selected in the dialog (e.g. "Jun 17, 2026").
-async function readSelectedDate(dialog: Locator): Promise<Date | null> {
-  const dateBtn = dialog.locator("button", { hasText: /\w{3}\s\d{1,2},\s\d{4}/ }).first();
-  const txt = await dateBtn.textContent().catch(() => null);
+// The modal's selected-date button, named like "Tue, Aug 18, 2026" (weekday,
+// month day, year) — distinct from the date-range buttons in the pricing table.
+function modalDateButton(page: Page): Locator {
+  return page.getByRole("button", { name: /\w{3,9},\s\w{3}\s\d{1,2},\s\d{4}/ }).first();
+}
+
+// Read the date currently selected in the Run simulation modal.
+async function readSelectedDate(page: Page): Promise<Date | null> {
+  const txt = await modalDateButton(page).textContent().catch(() => null);
   return txt ? parseHumanDate(txt) : null;
 }
 
 // Read the per-step cap from the note ("...advance the simulation time to <date>...").
-async function readCapDate(dialog: Locator): Promise<Date | null> {
-  const note = dialog.getByText(/advance the simulation time to/i).first();
+async function readCapDate(page: Page): Promise<Date | null> {
+  const note = page.getByText(/advance the simulation time to/i).first();
   const txt = await note.textContent().catch(() => null);
   const m = txt?.match(/to\s+(.+?)(?:\s+at\b|\.|$)/i);
   return m ? parseHumanDate(m[1]) : null;
@@ -224,26 +235,27 @@ function presetCandidate(from: Date, label: string): Date {
 // Steps 14-15: advance the test clock toward (current clock + span), looping
 // across the per-step cap, waiting for each advance to complete.
 export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: ParsedSpan, hooks: StripeFlowHooks = {}): Promise<void> {
-  let dialog = await runSimulation(page, cfg, hooks);
-  const clockStart = (await readSelectedDate(dialog)) ?? new Date();
+  await runSimulation(page, cfg, hooks);
+  const clockStart = (await readSelectedDate(page)) ?? new Date();
   const target = addSpan(clockStart, span);
 
   const presets = ["1 month", "1 week", "1 day", "1 hour"];
   let guard = 0;
   while (guard++ < 80) {
-    let selected = (await readSelectedDate(dialog)) ?? clockStart;
-    const cap = (await readCapDate(dialog)) ?? target;
+    let selected = (await readSelectedDate(page)) ?? clockStart;
+    const cap = (await readCapDate(page)) ?? target;
     const stepTarget = target.getTime() < cap.getTime() ? target : cap;
 
     // Click the largest preset whose result stays within this step's target.
+    // PAGE-scoped (see runSimulation note): modal controls live outside the dialog node.
     let progressed = false;
     let innerGuard = 0;
     while (selected.getTime() < stepTarget.getTime() && innerGuard++ < 60) {
       const label = presets.find((p) => presetCandidate(selected, p).getTime() <= stepTarget.getTime());
       if (!label) break;
-      await dialog.getByRole("button", { name: new RegExp(`^${label}$`, "i") }).first().click();
-      await page.waitForTimeout(250);
-      const after = (await readSelectedDate(dialog)) ?? selected;
+      await page.getByRole("button", { name: new RegExp(`^${label}$`, "i") }).first().click({ timeout: cfg.stripe.stepTimeoutMs });
+      await page.waitForTimeout(300);
+      const after = (await readSelectedDate(page)) ?? selected;
       if (after.getTime() <= selected.getTime()) break; // no progress (hit cap)
       selected = after;
       progressed = true;
@@ -251,23 +263,22 @@ export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: Parse
 
     if (!progressed) {
       // Can't push further within the cap toward target; advance with one day as a fallback.
-      await dialog.getByRole("button", { name: /^1 day$/i }).first().click().catch(() => undefined);
-      await page.waitForTimeout(250);
+      await page.getByRole("button", { name: /^1 day$/i }).first().click({ timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+      await page.waitForTimeout(300);
     }
 
-    await dialog.getByRole("button", { name: /^advance time$/i }).first().click();
+    await page.getByRole("button", { name: /^advance time$/i }).first().click({ timeout: cfg.stripe.stepTimeoutMs });
 
-    // The dialog closes once the advance is submitted; then the test clock
-    // processes the step server-side. (The "test clock is advancing" panel text
-    // is a static heading, not a progress indicator, so we don't wait on it.)
-    await dialog.waitFor({ state: "hidden", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+    // The modal closes once the advance is submitted; wait for its date button to
+    // detach, then let the test clock process the step server-side. (The "test
+    // clock is advancing" panel text is a static heading, not a progress signal.)
+    await modalDateButton(page).waitFor({ state: "hidden", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
     await page.waitForTimeout(8000);
 
-    const reachedDate = selected;
-    if (reachedDate.getTime() >= target.getTime()) break;
+    if (selected.getTime() >= target.getTime()) break;
 
-    // Reopen the dialog for the next step (the cap will have moved forward).
-    dialog = await runSimulation(page, cfg, hooks);
+    // Reopen the modal for the next step (the cap will have moved forward).
+    await runSimulation(page, cfg, hooks);
   }
   await shot(page, "simulation-completed");
 }
