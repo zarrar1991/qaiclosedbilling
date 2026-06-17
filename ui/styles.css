@@ -1,32 +1,63 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-body { @apply bg-slate-950 text-slate-100; }
 
-/* Slim, dark matte-black scrollbars (Chromium / Electron) */
+body {
+  @apply bg-canvas text-ink antialiased;
+  font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+  margin: 0;
+}
+
+/* iClosed system reusable controls. Density/size defaults live here; call sites
+   override height/padding/text-size with utilities (higher layer = wins). */
+@layer components {
+  .ic-page-title { @apply mb-[18px] text-[19px] font-extrabold tracking-[-0.02em] text-ink; }
+  .ic-section { @apply text-[11px] font-bold uppercase tracking-[.1em] text-muted; }
+  .ic-label { @apply mb-1.5 block text-[12px] font-semibold text-strong; }
+  .ic-sublabel { @apply mb-1.5 block text-[11px] font-semibold tracking-[.04em] text-[#64748B]; }
+  .ic-card { @apply rounded-xl border border-line bg-white shadow-[0_1px_2px_rgba(16,24,40,.05)]; }
+
+  .ic-input {
+    @apply h-9 w-full rounded-lg border-[1.5px] border-field bg-white px-3 text-[13px] text-ink outline-none transition;
+  }
+  .ic-input:focus { @apply border-navy shadow-[0_0_0_3px_rgba(3,25,83,.14)]; }
+
+  .ic-select {
+    @apply h-9 w-full cursor-pointer appearance-none rounded-lg border-[1.5px] border-field bg-white pl-3 pr-8 text-[12.5px] font-semibold text-ink outline-none transition;
+  }
+  .ic-select:focus { @apply border-navy shadow-[0_0_0_3px_rgba(3,25,83,.14)]; }
+
+  .ic-btn {
+    @apply inline-flex cursor-pointer items-center justify-center rounded-lg font-bold transition disabled:cursor-default disabled:opacity-50;
+    font-family: inherit;
+  }
+  .ic-btn-primary { @apply ic-btn border-none bg-navy text-white; }
+  .ic-btn-primary:hover:not(:disabled) { @apply bg-navy-hover; }
+  .ic-btn-secondary { @apply ic-btn border-[1.5px] border-field bg-white text-ink; }
+  .ic-btn-secondary:hover:not(:disabled) { @apply border-ink; }
+  .ic-btn-danger { @apply ic-btn border-[1.5px] border-[#F3C7C7] bg-white text-danger; }
+  .ic-btn-danger:hover:not(:disabled) { @apply border-danger bg-danger-bg; }
+}
+
+@layer utilities {
+  .ic-drag { -webkit-app-region: drag; }
+  .ic-no-drag { -webkit-app-region: no-drag; }
+}
+
+input[type="radio"],
+input[type="checkbox"] { accent-color: #031953; }
+
+/* Light scrollbars (Chromium / Electron), matching the design bundle. */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #18181b transparent;
+  scrollbar-color: #d5dae1 transparent;
 }
-::-webkit-scrollbar {
-  width: 10px;
-  height: 10px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-  border-radius: 9999px;
-}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  border-radius: 9999px;
-  background: #161618;
-  background-clip: content-box;
-  border: 2px solid transparent;
+  background: #d5dae1;
+  border-radius: 8px;
+  border: 3px solid #f8fafc;
 }
-::-webkit-scrollbar-thumb:hover {
-  background: #242427;
-  background-clip: content-box;
-  border: 2px solid transparent;
-}
-::-webkit-scrollbar-corner {
-  background: transparent;
-}
+::-webkit-scrollbar-thumb:hover { background: #c2c9d3; }
+::-webkit-scrollbar-corner { background: transparent; }

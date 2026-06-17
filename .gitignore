@@ -12,3 +12,6 @@ artifacts/
 iclosed-module.zip
 .iclosed-module-extract/
 debug/
+
+# design handoff bundle + local QA screenshots (not source)
+.design-tmp/
