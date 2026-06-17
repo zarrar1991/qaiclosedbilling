@@ -54,16 +54,26 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     setMsg(r.ok ? { ok: true, text: `Database connection OK (${selected})` } : { ok: false, text: r.error });
   }
 
-  async function newProfile() {
+  async function createProfile(values: Record<string, string>, successText: (name: string) => string) {
     const name = newName.trim();
     if (!name) { setMsg({ ok: false, text: "Enter a profile name first" }); return; }
     if (names.includes(name)) { setMsg({ ok: false, text: `Profile "${name}" already exists` }); return; }
-    const r = await api.saveProfile(name, {});
+    const r = await api.saveProfile(name, values);
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
     setNewName("");
     await refreshList(name);
     onProfilesChanged?.();
-    setMsg({ ok: true, text: `Profile "${name}" created — fill in its values and Save` });
+    setMsg({ ok: true, text: successText(name) });
+  }
+
+  function newProfile() {
+    return createProfile({}, (n) => `Profile "${n}" created — fill in its values and Save`);
+  }
+
+  // Duplicate the currently selected profile's values into a new profile.
+  function duplicateProfile() {
+    if (!selected) { setMsg({ ok: false, text: "Select a profile to duplicate first" }); return; }
+    return createProfile({ ...vals }, (n) => `Duplicated "${selected}" → "${n}"`);
   }
 
   async function deleteProfile() {
@@ -115,6 +125,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
             />
           </label>
           <button onClick={newProfile} disabled={!newName.trim()} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">Create</button>
+          <button onClick={duplicateProfile} disabled={!newName.trim() || !selected} title={selected ? `Copy values from "${selected}"` : "Select a profile to duplicate"} className="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800 disabled:opacity-50">Duplicate current</button>
         </div>
       </section>
 
