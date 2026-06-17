@@ -189,12 +189,18 @@ export async function runSimulation(page: Page, cfg: AppConfig, hooks: StripeFlo
     await shot(page, "simulation-started");
     return;
   }
-  const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
+  // Fresh subscription shows a "Run simulation" button; once a simulation has
+  // run, the page shows an inline "Advance time" button instead. Either opens
+  // the modal.
+  const opener = page
+    .getByRole("button", { name: /^run simulation$/i })
+    .or(page.getByRole("button", { name: /^advance time$/i }))
+    .first();
   // The subscription detail page (and its test-clock panel) renders async after
-  // navigation, so wait for the button before deciding it's missing.
-  await btn.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
-  if (await btn.isVisible().catch(() => false)) {
-    await btn.click();
+  // navigation, so wait for the opener before deciding it's missing.
+  await opener.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
+  if (await opener.isVisible().catch(() => false)) {
+    await opener.click();
   } else {
     await manualStep("Could not find 'Run simulation'. Open the simulation dialog manually,", hooks);
   }
@@ -236,14 +242,18 @@ function presetCandidate(from: Date, label: string): Date {
 // across the per-step cap, waiting for each advance to complete.
 export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: ParsedSpan, hooks: StripeFlowHooks = {}): Promise<void> {
   await runSimulation(page, cfg, hooks);
-  const clockStart = (await readSelectedDate(page)) ?? new Date();
-  const target = addSpan(clockStart, span);
+  // Compare by calendar day (floor to local midnight): the modal dates are
+  // date-only, but a fallback `new Date()` carries a time-of-day that would
+  // otherwise make the target unreachable.
+  const floorDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  const clockStart = floorDay((await readSelectedDate(page)) ?? new Date());
+  const target = floorDay(addSpan(clockStart, span));
 
   const presets = ["1 month", "1 week", "1 day", "1 hour"];
   let guard = 0;
   while (guard++ < 80) {
-    let selected = (await readSelectedDate(page)) ?? clockStart;
-    const cap = (await readCapDate(page)) ?? target;
+    let selected = floorDay((await readSelectedDate(page)) ?? clockStart);
+    const cap = floorDay((await readCapDate(page)) ?? target);
     const stepTarget = target.getTime() < cap.getTime() ? target : cap;
 
     // Click the largest preset whose result stays within this step's target.
@@ -255,7 +265,7 @@ export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: Parse
       if (!label) break;
       await page.getByRole("button", { name: new RegExp(`^${label}$`, "i") }).first().click({ timeout: cfg.stripe.stepTimeoutMs });
       await page.waitForTimeout(300);
-      const after = (await readSelectedDate(page)) ?? selected;
+      const after = floorDay((await readSelectedDate(page)) ?? selected);
       if (after.getTime() <= selected.getTime()) break; // no progress (hit cap)
       selected = after;
       progressed = true;
