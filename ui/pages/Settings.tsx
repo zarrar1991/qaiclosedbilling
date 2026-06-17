@@ -13,6 +13,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
   const [selected, setSelected] = useState<string>("");
   const [vals, setVals] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [newName, setNewName] = useState("");
 
   async function loadProfile(name: string) {
     if (!name) { setVals({}); return; }
@@ -53,11 +54,12 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
   }
 
   async function newProfile() {
-    const name = window.prompt("New profile name (e.g. Stage, Prod):")?.trim();
-    if (!name) return;
+    const name = newName.trim();
+    if (!name) { setMsg({ ok: false, text: "Enter a profile name first" }); return; }
     if (names.includes(name)) { setMsg({ ok: false, text: `Profile "${name}" already exists` }); return; }
     const r = await api.saveProfile(name, {});
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+    setNewName("");
     await refreshList(name);
     onProfilesChanged?.();
     setMsg({ ok: true, text: `Profile "${name}" created — fill in its values and Save` });
@@ -97,9 +99,21 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
               {names.map((n) => <option key={n} value={n}>{n}{n === active ? " (default)" : ""}</option>)}
             </select>
           </label>
-          <button onClick={newProfile} className="rounded-lg border border-slate-700 px-3 py-2 hover:bg-slate-800">New profile</button>
           <button onClick={makeActive} disabled={!selected} className="rounded-lg border border-slate-700 px-3 py-2 hover:bg-slate-800 disabled:opacity-50">Set as default</button>
           <button onClick={deleteProfile} disabled={!selected} className="rounded-lg border border-rose-700/60 px-3 py-2 text-rose-300 hover:bg-rose-900/30 disabled:opacity-50">Delete</button>
+        </div>
+        <div className="flex items-end gap-2 pt-1">
+          <label className="block">
+            <span className="mb-1 block text-sm text-slate-400">New profile name</span>
+            <input
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") newProfile(); }}
+              placeholder="e.g. Stage, Prod"
+              className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 outline-none focus:border-sky-500"
+            />
+          </label>
+          <button onClick={newProfile} disabled={!newName.trim()} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">Create</button>
         </div>
       </section>
 
