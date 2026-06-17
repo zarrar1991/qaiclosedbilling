@@ -6,6 +6,7 @@ export interface AppConfig {
     user: string;
     password: string;
     sslmode: string;
+    schema: string; // optional search_path override; "" = DB role default
   };
   stripe: {
     dashboardUrl: string;

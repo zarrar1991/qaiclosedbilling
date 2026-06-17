@@ -16,6 +16,9 @@ export function createPool(cfg: AppConfig): pg.Pool {
     user: cfg.pg.user,
     password: cfg.pg.password,
     ssl: cfg.pg.sslmode === "disable" ? false : { rejectUnauthorized: cfg.pg.sslmode === "verify-full" },
+    // Force the schema's search_path when PGSCHEMA is set; otherwise use the
+    // DB role's default search_path. Applied at connection startup.
+    ...(cfg.pg.schema ? { options: `-c search_path=${cfg.pg.schema},public` } : {}),
   });
 }
 

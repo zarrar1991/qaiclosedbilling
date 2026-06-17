@@ -29,10 +29,14 @@ export function parseConfig(env: Env): AppConfig {
       user: required(env, "PGUSER", missing),
       password: required(env, "PGPASSWORD", missing),
       sslmode: required(env, "PGSSLMODE", missing),
+      // Optional: force a schema's search_path. Blank = use the DB role default.
+      schema: env.PGSCHEMA?.trim() ?? "",
     },
     stripe: {
       dashboardUrl: required(env, "STRIPE_DASHBOARD_URL", missing),
-      environmentName: required(env, "STRIPE_ENVIRONMENT_NAME", missing),
+      // Optional: which Stripe environment to select. Blank = don't switch
+      // (assume the saved session is already on the right one).
+      environmentName: env.STRIPE_ENVIRONMENT_NAME?.trim() ?? "",
       authProfileDir: required(env, "STRIPE_AUTH_PROFILE_DIR", missing),
       stepTimeoutMs: num(env.STRIPE_STEP_TIMEOUT_MS ?? "", 30000),
       longTimeoutMs: num(env.STRIPE_LONG_TIMEOUT_MS ?? "", 120000),

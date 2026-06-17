@@ -63,8 +63,10 @@ async function ensureLoggedIn(page: Page, cfg: AppConfig): Promise<void> {
   }
 }
 
-// Step 3-4: ensure the iclosed.io(development) environment is selected.
+// Step 3-4: ensure the configured environment is selected. If the env name is
+// blank, skip (assume the saved session is already on the right environment).
 export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig): Promise<void> {
+  if (!cfg.stripe.environmentName) return;
   const switcher = accountSwitcher(page);
   const name = (await switcher.getAttribute("aria-label").catch(() => null)) ?? "";
   if (name.toLowerCase().includes(cfg.stripe.environmentName.toLowerCase())) return;
