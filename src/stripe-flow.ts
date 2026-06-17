@@ -149,17 +149,22 @@ export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: str
   return page.url().match(/customers\/(cus_[A-Za-z0-9]+)/)?.[1] ?? null;
 }
 
-// Step 11: wait for the "Collection paused" indicator on the subscription.
+// Step 11: wait for the "Collection paused" indicator. Stripe's page only shows
+// the badge after a reload, so poll with reloads (every ~6s) up to the long
+// timeout, returning true as soon as it appears.
 export async function waitForCollectionPaused(page: Page, cfg: AppConfig): Promise<boolean> {
-  const tag = page.getByText(/collection paused/i).first();
-  try {
-    await tag.waitFor({ state: "visible", timeout: cfg.stripe.longTimeoutMs });
-    await shot(page, "collection-paused-found");
-    return true;
-  } catch {
-    await shot(page, "collection-paused-missing");
-    return false;
+  const deadline = Date.now() + cfg.stripe.longTimeoutMs;
+  while (Date.now() < deadline) {
+    const seen = await page.getByText(/collection paused/i).first().isVisible().catch(() => false);
+    if (seen) {
+      await shot(page, "collection-paused-found");
+      return true;
+    }
+    await page.waitForTimeout(6000);
+    await page.reload({ waitUntil: "domcontentloaded" }).catch(() => undefined);
   }
+  await shot(page, "collection-paused-missing");
+  return false;
 }
 
 // Step 12: open the subscription from the customer page. Returns its sub_ id.
@@ -316,7 +321,8 @@ export async function verifyActiveSubscriptionForEmail(
     } else {
       await openCustomerByEmail(page, cfg, email);
     }
-    await page.waitForTimeout(1500);
+    // The customer page's subscription rows render async (~6s); wait before reading.
+    await page.waitForTimeout(6000);
 
     // Each subscription is a table row containing a /subscriptions/sub_ link.
     const rows = page.getByRole("row").filter({ has: page.locator('a[href*="/subscriptions/sub_"]') });
@@ -339,7 +345,7 @@ export async function verifyActiveSubscriptionForEmail(
       }
     }
     if (confirmed) break;
-    await page.waitForTimeout(5000);
+    await page.waitForTimeout(3000);
   }
 
   if (confirmed) await shot(page, "active-subscription-confirmed");
