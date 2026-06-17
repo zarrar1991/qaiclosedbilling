@@ -1,5 +1,5 @@
 import { loadConfig } from "./config.js";
-import { promptEmail, promptSpan, promptConfirm, promptSubscriptionChoice, promptTypeToken } from "./prompts.js";
+import { promptEmail, promptSpan, promptConfirm, promptSubscriptionChoice, promptTypeToken, closePrompts } from "./prompts.js";
 import { createPool, lookupAccountId, fetchSubscriptions, updateRenewal, reselectByIds } from "./db.js";
 import { chooseTargetSubscription } from "./selection.js";
 import { computeRenewalUTC, formatTimestampUTC, parseSpan } from "./time.js";
@@ -20,8 +20,10 @@ async function main(): Promise<void> {
   const cfg = loadConfig();
   console.log(`DRY_RUN=${cfg.dryRun}  (set DRY_RUN=false in .env to perform writes/advance)`);
 
-  const email = await promptEmail();
-  const spanRaw = await promptSpan();
+  // Inputs default to interactive prompts, but env vars override them so the
+  // tool can be driven non-interactively (testing / future UI / automation).
+  const email = process.env.TARGET_EMAIL || (await promptEmail());
+  const spanRaw = process.env.ADVANCE_SPAN || (await promptSpan());
   const span = parseSpan(spanRaw);
 
   const pool = createPool(cfg);
@@ -41,7 +43,8 @@ async function main(): Promise<void> {
     if (rows.length === 0) throw new Error("No active (non-deleted) subscription found.");
     printRows(rows);
 
-    let choice: string | undefined = rows.length > 1 ? await promptSubscriptionChoice() : undefined;
+    let choice: string | undefined =
+      rows.length > 1 ? process.env.SUB_CHOICE || (await promptSubscriptionChoice()) : undefined;
     let selection = chooseTargetSubscription(rows, choice);
     while (selection.kind === "invalid") {
       console.log(`Invalid id "${selection.input}". Try again.`);
@@ -127,6 +130,7 @@ async function main(): Promise<void> {
       notes: [...notes, ...result.notes],
     });
   } finally {
+    closePrompts();
     await pool.end().catch(() => undefined);
   }
 }

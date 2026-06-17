@@ -3,6 +3,11 @@ import type { AppConfig, SubscriptionRow } from "./types.js";
 
 const { Pool } = pg;
 
+// Return "timestamp without time zone" (OID 1114) columns as their raw stored
+// string instead of a local-time JS Date, so renewal/createdAt values are shown
+// and compared exactly as stored (the app treats these as UTC wall-clock).
+pg.types.setTypeParser(1114, (v) => v);
+
 export function createPool(cfg: AppConfig): pg.Pool {
   return new Pool({
     host: cfg.pg.host,

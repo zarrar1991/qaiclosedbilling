@@ -1,14 +1,24 @@
-import { createInterface } from "node:readline/promises";
+import { createInterface, type Interface } from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 
+// A single shared readline interface for the whole session. Creating/closing
+// one per question tears down stdin on piped (non-TTY) input, so we reuse one
+// and close it explicitly via closePrompts() when the run finishes.
+let rl: Interface | null = null;
+
+function getRl(): Interface {
+  if (!rl) rl = createInterface({ input, output });
+  return rl;
+}
+
 async function ask(question: string): Promise<string> {
-  const rl = createInterface({ input, output });
-  try {
-    const answer = await rl.question(question);
-    return answer.trim();
-  } finally {
-    rl.close();
-  }
+  const answer = await getRl().question(question);
+  return answer.trim();
+}
+
+export function closePrompts(): void {
+  rl?.close();
+  rl = null;
 }
 
 export async function promptEmail(): Promise<string> {
