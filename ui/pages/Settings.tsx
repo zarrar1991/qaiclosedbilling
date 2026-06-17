@@ -7,7 +7,7 @@ const DB_KEYS = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSS
 const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_AUTH_PROFILE_DIR",
   "STRIPE_STEP_TIMEOUT_MS", "STRIPE_LONG_TIMEOUT_MS", "DEFAULT_RENEWAL_OFFSET_MINUTES", "PLAYWRIGHT_SLOW_MO_MS"];
 
-export function Settings() {
+export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void }) {
   const [names, setNames] = useState<string[]>([]);
   const [active, setActive] = useState<string>("");
   const [selected, setSelected] = useState<string>("");
@@ -43,7 +43,7 @@ export function Settings() {
   async function save() {
     if (!selected) return;
     const r = await api.saveProfile(selected, vals);
-    if (r.ok) { setNames(r.data.names); setActive(r.data.activeProfile); }
+    if (r.ok) { setNames(r.data.names); setActive(r.data.activeProfile); onProfilesChanged?.(); }
     setMsg(r.ok ? { ok: true, text: `Profile "${selected}" saved` } : { ok: false, text: r.error });
   }
 
@@ -59,6 +59,7 @@ export function Settings() {
     const r = await api.saveProfile(name, {});
     if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
     await refreshList(name);
+    onProfilesChanged?.();
     setMsg({ ok: true, text: `Profile "${name}" created — fill in its values and Save` });
   }
 
@@ -72,13 +73,14 @@ export function Settings() {
     const next = r.data.names[0] ?? "";
     setSelected(next);
     await loadProfile(next);
+    onProfilesChanged?.();
     setMsg({ ok: true, text: "Profile deleted" });
   }
 
   async function makeActive() {
     if (!selected) return;
     const r = await api.setActiveProfile(selected);
-    if (r.ok) { setActive(r.data.activeProfile); setMsg({ ok: true, text: `"${selected}" is now the default profile` }); }
+    if (r.ok) { setActive(r.data.activeProfile); onProfilesChanged?.(); setMsg({ ok: true, text: `"${selected}" is now the default profile` }); }
   }
 
   return (
