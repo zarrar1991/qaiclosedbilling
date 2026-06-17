@@ -43,6 +43,7 @@ export const CH = {
   profilesList: "profiles:list",
   profilesGet: "profiles:get",
   profilesSave: "profiles:save",
+  profilesRename: "profiles:rename",
   profilesDelete: "profiles:delete",
   profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",

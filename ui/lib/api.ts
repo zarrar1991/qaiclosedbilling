@@ -6,6 +6,7 @@ interface Api {
   loadProfiles(): Promise<IpcResult<ProfilesList>>;
   getProfile(name: string): Promise<IpcResult<Record<string, string>>>;
   saveProfile(name: string, values: Record<string, string>): Promise<IpcResult<ProfilesList>>;
+  renameProfile(from: string, to: string): Promise<IpcResult<ProfilesList>>;
   deleteProfile(name: string): Promise<IpcResult<ProfilesList>>;
   setActiveProfile(name: string): Promise<IpcResult<ProfilesList>>;
   // Operations (each takes the selected profile name)

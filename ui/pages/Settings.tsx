@@ -76,6 +76,22 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     return createProfile({ ...vals }, (n) => `Duplicated "${selected}" → "${n}"`);
   }
 
+  // Rename the selected profile to the name typed in "New profile name".
+  async function renameProfile() {
+    if (!selected) { setMsg({ ok: false, text: "Select a profile to rename first" }); return; }
+    const to = newName.trim();
+    if (!to) { setMsg({ ok: false, text: "Enter the new name in 'New profile name'" }); return; }
+    if (to !== selected && names.includes(to)) { setMsg({ ok: false, text: `Profile "${to}" already exists` }); return; }
+    const r = await api.renameProfile(selected, to);
+    if (!r.ok) { setMsg({ ok: false, text: r.error }); return; }
+    setNewName("");
+    setNames(r.data.names); setActive(r.data.activeProfile);
+    setSelected(to);
+    await loadProfile(to);
+    onProfilesChanged?.();
+    setMsg({ ok: true, text: `Renamed to "${to}"` });
+  }
+
   async function deleteProfile() {
     if (!selected) return;
     if (!window.confirm(`Delete profile "${selected}"?`)) return;
@@ -126,6 +142,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
           </label>
           <button onClick={newProfile} disabled={!newName.trim()} className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">Create</button>
           <button onClick={duplicateProfile} disabled={!newName.trim() || !selected} title={selected ? `Copy values from "${selected}"` : "Select a profile to duplicate"} className="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800 disabled:opacity-50">Duplicate current</button>
+          <button onClick={renameProfile} disabled={!newName.trim() || !selected} title={selected ? `Rename "${selected}"` : "Select a profile to rename"} className="rounded-lg border border-slate-700 px-4 py-2 hover:bg-slate-800 disabled:opacity-50">Rename current</button>
         </div>
       </section>
 

@@ -7,6 +7,7 @@ const CH = {
   profilesList: "profiles:list",
   profilesGet: "profiles:get",
   profilesSave: "profiles:save",
+  profilesRename: "profiles:rename",
   profilesDelete: "profiles:delete",
   profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",
@@ -27,6 +28,7 @@ contextBridge.exposeInMainWorld("api", {
   loadProfiles: () => ipcRenderer.invoke(CH.profilesList),
   getProfile: (name) => ipcRenderer.invoke(CH.profilesGet, name),
   saveProfile: (name, values) => ipcRenderer.invoke(CH.profilesSave, { name, values }),
+  renameProfile: (from, to) => ipcRenderer.invoke(CH.profilesRename, { from, to }),
   deleteProfile: (name) => ipcRenderer.invoke(CH.profilesDelete, name),
   setActiveProfile: (name) => ipcRenderer.invoke(CH.profilesSetActive, name),
   // Operations (each takes the selected profile name)

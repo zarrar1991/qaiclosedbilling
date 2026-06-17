@@ -154,6 +154,20 @@ ipcMain.handle(CH.profilesSave, (_e, payload: { name: string; values: Record<str
     return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
   }),
 );
+ipcMain.handle(CH.profilesRename, (_e, p: { from: string; to: string }) =>
+  wrap(async () => {
+    const to = p.to.trim();
+    const f = readProfiles(profilesPath(), envPath());
+    if (!(p.from in f.profiles)) throw new Error(`Profile "${p.from}" not found`);
+    if (!to) throw new Error("New profile name is required");
+    if (to !== p.from && to in f.profiles) throw new Error(`Profile "${to}" already exists`);
+    f.profiles[to] = f.profiles[p.from];
+    if (to !== p.from) delete f.profiles[p.from];
+    if (f.activeProfile === p.from) f.activeProfile = to;
+    writeProfiles(profilesPath(), f);
+    return { activeProfile: f.activeProfile, names: Object.keys(f.profiles) };
+  }),
+);
 ipcMain.handle(CH.profilesDelete, (_e, name: string) =>
   wrap(async () => {
     const f = readProfiles(profilesPath(), envPath());
