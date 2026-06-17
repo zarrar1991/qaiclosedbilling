@@ -3,7 +3,7 @@ export type Page = "renewal" | "full" | "createuser" | "settings";
 export function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
   const items: { id: Page; label: string }[] = [
     { id: "createuser", label: "Create user" },
-    { id: "renewal", label: "Change renewal date" },
+    { id: "renewal", label: "Update renewal date" },
     { id: "full", label: "Downgrade" },
     { id: "settings", label: "Settings" },
   ];

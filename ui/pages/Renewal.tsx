@@ -54,7 +54,7 @@ export function Renewal({ profile }: { profile: string }) {
 
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Change renewal date</h1>
+      <h1 className="text-2xl font-bold">Update renewal date</h1>
       <div className="max-w-md">
         <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
       </div>
