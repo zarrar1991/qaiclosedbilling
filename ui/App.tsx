@@ -7,7 +7,7 @@ import { Settings } from "./pages/Settings.js";
 import { api } from "./lib/api.js";
 
 export default function App() {
-  const [page, setPage] = useState<Page>("renewal");
+  const [page, setPage] = useState<Page>("createuser");
   const [profile, setProfile] = useState("");
   const [names, setNames] = useState<string[]>([]);
 
