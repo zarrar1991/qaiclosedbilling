@@ -1,5 +1,6 @@
 import { app, BrowserWindow, ipcMain, shell } from "electron";
 import { join, dirname } from "node:path";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import https from "node:https";
@@ -132,9 +133,13 @@ async function wrap<T>(fn: () => Promise<T>): Promise<IpcResult<T>> {
 }
 
 function createWindow(): void {
+  // In dev, show the branded icon on the taskbar (packaged builds use the
+  // executable's own icon, set by electron-builder from build/icon.png).
+  const devIcon = join(process.cwd(), "build", "icon.png");
   const win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: "#F8FAFC",
     frame: false, // frameless: the renderer draws its own title bar (see ui/components/TitleBar.tsx)
+    ...(app.isPackaged ? {} : existsSync(devIcon) ? { icon: devIcon } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });
   if (app.isPackaged) win.loadFile(join(__dirname, "../dist-ui/index.html"));

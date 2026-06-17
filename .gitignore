@@ -2,6 +2,7 @@ node_modules/
 dist/
 dist-ui/
 dist-electron/
+release/
 .env
 profiles.json
 .auth/
