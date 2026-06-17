@@ -61,7 +61,7 @@ export function Renewal() {
       <div className="flex items-center gap-3">
         <button disabled={disabled} onClick={start}
           className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
-          {busy ? "Working…" : "Update renewal"}
+          {busy ? "Working…" : "Update"}
         </button>
         <button disabled={disabled} onClick={runSearch}
           className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
