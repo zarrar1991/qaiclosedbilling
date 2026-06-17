@@ -53,33 +53,34 @@ export function Renewal({ profile }: { profile: string }) {
   const disabled = busy || searching || !email || !profile;
 
   return (
-    <div className="max-w-4xl space-y-6">
-      <h1 className="text-2xl font-bold">Update renewal date</h1>
-      <div className="max-w-md">
+    <div className="max-w-[920px]">
+      <h1 className="ic-page-title">Update renewal date</h1>
+      <div className="max-w-[460px]">
         <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
       </div>
-      <div className="flex items-center gap-3">
-        <button disabled={disabled} onClick={start}
-          className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
+      <div className="mt-4 flex items-center gap-2.5">
+        <button disabled={disabled} onClick={start} className="ic-btn-primary px-[18px] py-2 text-[13px]">
           {busy ? "Working…" : "Update"}
         </button>
-        <button disabled={disabled} onClick={runSearch}
-          className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
+        <button disabled={disabled} onClick={runSearch} className="ic-btn-secondary px-[17px] py-[7px] text-[13px]">
           {searching ? "Searching…" : "Search"}
         </button>
         <button title="Refresh results" aria-label="Refresh results" disabled={disabled} onClick={runSearch}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-slate-300 hover:bg-slate-800 disabled:opacity-50">
-          <span className={searching ? "inline-block animate-spin" : "inline-block"}>⟳</span>
+          className="ic-btn-secondary h-9 w-9 text-[#64748B]">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+            className={searching ? "animate-spin" : ""}>
+            <path d="M21 12a9 9 0 1 1-3-6.7L21 8" /><path d="M21 3v5h-5" />
+          </svg>
         </button>
       </div>
 
-      {rows && <SubscriptionPicker rows={rows} onPick={doUpdate} />}
-      {result && <Banner kind={result.ok ? "success" : "error"} title={result.ok ? "Renewal updated" : "Failed"}>{result.msg}</Banner>}
-      {searchError && <Banner kind="error" title="Search failed">{searchError}</Banner>}
+      {rows && <div className="mt-5"><SubscriptionPicker rows={rows} onPick={doUpdate} /></div>}
+      {result && <div className="mt-4"><Banner kind={result.ok ? "success" : "error"} title={result.ok ? "Renewal updated" : "Failed"}>{result.msg}</Banner></div>}
+      {searchError && <div className="mt-4"><Banner kind="error" title="Search failed">{searchError}</Banner></div>}
 
       {searchRows && (
-        <section className="space-y-3">
-          <h2 className="text-xl font-bold">Subscription(s)</h2>
+        <section className="mt-[26px]">
+          <h2 className="mb-[11px] text-[15px] font-extrabold tracking-[-0.01em] text-ink">Subscription(s)</h2>
           <SubscriptionsTable email={email} rows={searchRows} />
         </section>
       )}

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
+import { Select } from "../components/Select.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
 import { SearchableSelect } from "../components/SearchableSelect.js";
 import type { IClosedResult, IClosedProgress } from "../../electron/ipc.js";
@@ -148,11 +149,11 @@ export function CreateUser({ profile }: { profile: string }) {
   }
 
   return (
-    <div className="max-w-2xl space-y-5">
-      <h1 className="text-2xl font-bold">Create user</h1>
+    <div className="max-w-[820px]">
+      <h1 className="ic-page-title">Create user</h1>
 
-      <label className="block max-w-md">
-        <span className="mb-1 block text-sm text-slate-400">Campaign</span>
+      <div className="max-w-[420px]">
+        <span className="ic-label">Campaign</span>
         <SearchableSelect
           options={campaigns.map((c) => ({ label: c.name, value: String(c.id) }))}
           value={selectedCampaign}
@@ -162,11 +163,11 @@ export function CreateUser({ profile }: { profile: string }) {
           disabled={running}
           placeholder="Select a campaign…"
         />
-      </label>
-      {campaignsError && <Banner kind="error" title="Couldn't load campaigns">{campaignsError}</Banner>}
+      </div>
+      {campaignsError && <div className="mt-3 max-w-[420px]"><Banner kind="error" title="Couldn't load campaigns">{campaignsError}</Banner></div>}
 
-      <label className="block max-w-md">
-        <span className="mb-1 block text-sm text-slate-400">Campaign Link</span>
+      <div className="mt-4 max-w-[420px]">
+        <span className="ic-label">Campaign Link</span>
         <SearchableSelect
           options={links.map((l) => ({ label: l.label, value: l.hash }))}
           value={selectedLink}
@@ -176,91 +177,90 @@ export function CreateUser({ profile }: { profile: string }) {
           disabled={running || !selectedCampaign}
           placeholder={selectedCampaign ? "Select a campaign link…" : "Pick a campaign first"}
         />
-      </label>
-      {linksError && <Banner kind="error" title="Couldn't load campaign links">{linksError}</Banner>}
+      </div>
+      {linksError && <div className="mt-3 max-w-[420px]"><Banner kind="error" title="Couldn't load campaign links">{linksError}</Banner></div>}
 
-      <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
-        placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />
-
-      <div className="space-y-2">
-        <span className="block text-sm text-slate-400">Email</span>
-        <div className="flex items-center gap-4 text-sm">
-          <label className="flex items-center gap-2">
-            <input type="radio" checked={emailMode === "random"} onChange={() => setEmailMode("random")} disabled={running} />
-            Random
-          </label>
-          <label className="flex items-center gap-2">
-            <input type="radio" checked={emailMode === "custom"} onChange={() => setEmailMode("custom")} disabled={running} />
-            User-Defined
-          </label>
-        </div>
-        {emailMode === "custom" && (
-          <Field label="" value={email} onChange={setEmail} placeholder="user@example.com" />
-        )}
+      <div className="mt-4 max-w-[640px]">
+        <Field label="Campaign URL" value={campaignUrl} onChange={setCampaignUrl}
+          placeholder="https://dev.iclosed.io/campaign?plan_hash=…" />
       </div>
 
-      <div className="flex items-end gap-2">
-        <div className="flex-1"><Field label="Password" value={password} onChange={setPassword} /></div>
-        <button onClick={() => setPassword(generatePassword())} disabled={running}
-          className="rounded-lg border border-slate-700 px-3 py-2 text-slate-300 hover:bg-slate-800 disabled:opacity-50">
+      <span className="ic-label mt-4">Email</span>
+      <div className="flex items-center gap-[22px]">
+        <label className="flex cursor-pointer items-center gap-[7px] text-[13px] text-strong">
+          <input type="radio" checked={emailMode === "random"} onChange={() => setEmailMode("random")} disabled={running} className="h-[15px] w-[15px]" />
+          Random
+        </label>
+        <label className="flex cursor-pointer items-center gap-[7px] text-[13px] text-strong">
+          <input type="radio" checked={emailMode === "custom"} onChange={() => setEmailMode("custom")} disabled={running} className="h-[15px] w-[15px]" />
+          User-Defined
+        </label>
+      </div>
+      {emailMode === "custom" && (
+        <div className="mt-2.5 max-w-[420px]">
+          <Field label="" value={email} onChange={setEmail} placeholder="user@example.com" />
+        </div>
+      )}
+
+      <span className="ic-label mt-4">Password</span>
+      <div className="flex max-w-[540px] items-center gap-2.5">
+        <div className="flex-1"><Field label="" value={password} onChange={setPassword} /></div>
+        <button onClick={() => setPassword(generatePassword())} disabled={running} className="ic-btn-secondary whitespace-nowrap px-4 py-[7px] text-[12.5px]">
           Regenerate
         </button>
       </div>
 
-      <div className="flex flex-wrap items-end gap-4">
-        <label className="block">
-          <span className="mb-1 block text-sm text-slate-400">Browser mode</span>
-          <select value={headless ? "headless" : "headed"} onChange={(e) => setHeadless(e.target.value === "headless")} disabled={running}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
-            <option value="headless">Headless</option>
-            <option value="headed">Headed</option>
-          </select>
-        </label>
-        <label className="flex items-center gap-2 pb-2 text-sm text-slate-300">
-          <input type="checkbox" checked={closeWhenDone} onChange={(e) => setCloseWhenDone(e.target.checked)} disabled={running} />
+      <span className="ic-label mt-4">Browser mode</span>
+      <div className="flex flex-wrap items-center gap-4">
+        <Select value={headless ? "headless" : "headed"} onChange={(v) => setHeadless(v === "headless")} disabled={running} className="w-[150px]">
+          <option value="headless">Headless</option>
+          <option value="headed">Headed</option>
+        </Select>
+        <label className="flex cursor-pointer items-center gap-2 text-[13px] text-strong">
+          <input type="checkbox" checked={closeWhenDone} onChange={(e) => setCloseWhenDone(e.target.checked)} disabled={running} className="h-[15px] w-[15px]" />
           Close browser when done
         </label>
       </div>
 
-      <button disabled={!canRun} onClick={run}
-        className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
+      <button disabled={!canRun} onClick={run} className="ic-btn-primary mt-[18px] px-[22px] py-[9px] text-[13px]">
         {running ? "Creating…" : "Create"}
       </button>
 
       {steps.length > 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <div className="ic-card mt-[22px] p-[18px]">
           <StatusTimeline steps={steps} done={state === "success"} failed={state === "error"} />
         </div>
       )}
 
-      {error && <Banner kind="error" title="Create failed">{error}</Banner>}
+      {error && <div className="mt-3.5"><Banner kind="error" title="Create failed">{error}</Banner></div>}
 
       {result && (
-        <Banner kind="success" title="User created">
-          <div className="mt-1 space-y-1">
-            {([
-              ["Email", result.email],
-              ["Password", result.password],
-              ["Username", result.username],
-            ] as const).map(([label, value]) => (
-              <div key={label} className="flex items-center gap-2">
-                <span className="w-24 text-slate-400">{label}</span>
-                <span className="font-mono text-slate-100">{value}</span>
-                <button onClick={() => copy(label, value)} className="text-xs text-sky-300 hover:underline">
-                  {copied === label ? "copied" : "copy"}
+        <div className="mt-3.5">
+          <Banner kind="success" title="User created">
+            <div className="space-y-1 font-mono text-[12px] text-ok">
+              {([
+                ["Email", result.email],
+                ["Password", result.password],
+                ["Username", result.username],
+              ] as const).map(([label, value]) => (
+                <div key={label} className="flex items-center gap-2.5">
+                  <span className="w-16 font-bold text-ok">{label}</span>
+                  <span className="text-ink">{value}</span>
+                  <button onClick={() => copy(label, value)} className="cursor-pointer border-none bg-transparent px-1 text-[12px] font-bold text-navy">
+                    {copied === label ? "copied" : "copy"}
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center gap-2.5">
+                <span className="w-16 font-bold text-ok">Workspace</span>
+                <a href="#" onClick={(e) => { e.preventDefault(); api.openExternal(result.workspaceUrl); }} className="text-navy hover:underline">{result.workspaceUrl}</a>
+                <button onClick={() => copy("Workspace", result.workspaceUrl)} className="cursor-pointer border-none bg-transparent px-1 text-[12px] font-bold text-navy">
+                  {copied === "Workspace" ? "copied" : "copy"}
                 </button>
               </div>
-            ))}
-            <div className="flex items-center gap-2">
-              <span className="w-24 text-slate-400">Workspace</span>
-              <a href="#" onClick={(e) => { e.preventDefault(); api.openExternal(result.workspaceUrl); }}
-                className="font-mono text-sky-300 hover:underline">{result.workspaceUrl}</a>
-              <button onClick={() => copy("Workspace", result.workspaceUrl)} className="text-xs text-sky-300 hover:underline">
-                {copied === "Workspace" ? "copied" : "copy"}
-              </button>
             </div>
-          </div>
-        </Banner>
+          </Banner>
+        </div>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { api } from "../lib/api.js";
 import { Field } from "../components/Field.js";
 import { Banner } from "../components/Banner.js";
+import { Select } from "../components/Select.js";
 import { StatusTimeline, type Step } from "../components/StatusTimeline.js";
 import type { RunReport } from "../../src/types.js";
 
@@ -34,52 +35,54 @@ export function FullDowngrade({ profile }: { profile: string }) {
   }
 
   return (
-    <div className="max-w-2xl space-y-4">
-      <h1 className="text-2xl font-bold">Downgrade</h1>
-      <div className="max-w-md">
+    <div className="max-w-[820px]">
+      <h1 className="ic-page-title">Downgrade subscription</h1>
+      <div className="max-w-[420px]">
         <Field label="Customer email" value={email} onChange={setEmail} placeholder="demo@example.com" />
       </div>
-      <div className="flex gap-3">
-        <label className="block">
-          <span className="mb-1 block text-sm text-slate-400">Advance interval</span>
-          <select value={preset} onChange={(e) => setPreset(e.target.value as typeof preset)}
-            className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+
+      <div className="mt-4 flex items-end gap-3">
+        <div>
+          <span className="ic-label">Advance interval</span>
+          <Select value={preset} onChange={(v) => setPreset(v as typeof preset)} className="w-[150px]">
             {PRESETS.map((p) => <option key={p} value={p}>{p}</option>)}
-          </select>
-        </label>
+          </Select>
+        </div>
         {preset === "Custom" && (
           <>
-            <Field label="Amount" value={amount} onChange={setAmount} />
-            <label className="block">
-              <span className="mb-1 block text-sm text-slate-400">Unit</span>
-              <select value={unit} onChange={(e) => setUnit(e.target.value as typeof unit)}
-                className="rounded-lg border border-slate-700 bg-slate-900 px-3 py-2">
+            <div className="w-[110px]"><Field label="Amount" value={amount} onChange={setAmount} /></div>
+            <div>
+              <span className="ic-label">Unit</span>
+              <Select value={unit} onChange={(v) => setUnit(v as typeof unit)} className="w-[130px]">
                 <option value="day">day</option><option value="month">month</option><option value="year">year</option>
-              </select>
-            </label>
+              </Select>
+            </div>
           </>
         )}
       </div>
-      <button disabled={busy || !email || !profile} onClick={run}
-        className="rounded-lg bg-gradient-to-r from-sky-500 to-violet-500 px-4 py-2 font-semibold disabled:opacity-50">
+
+      <button disabled={busy || !email || !profile} onClick={run} className="ic-btn-primary mt-[18px] px-5 py-[9px] text-[13px]">
         {busy ? "Running…" : "Downgrade"}
       </button>
+
       {steps.length > 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-4">
+        <div className="ic-card mt-[22px] p-[18px]">
           <StatusTimeline steps={steps} done={!!report && report.status === "PASS"} failed={!!error || (!!report && report.status === "FAIL")} />
         </div>
       )}
-      {error && <Banner kind="error" title="Downgrade failed">{error}</Banner>}
+      {error && <div className="mt-3.5"><Banner kind="error" title="Downgrade failed">{error}</Banner></div>}
       {report && (
-        <Banner kind={report.status === "PASS" ? "success" : "error"} title={`Downgrade ${report.status}`}>
-          <div className="space-y-0.5 font-mono text-xs">
-            <div>account {report.dbAccountId} · sub {report.dbSubscriptionId}</div>
-            <div>renewal {report.oldRenewalDate} → {report.newRenewalDate}</div>
-            <div>old stripe sub {report.oldStripeSubscriptionId ?? "-"}</div>
-            <div>new active sub {report.newStripeSubscriptionId ?? "-"}</div>
-            {report.notes.length > 0 && <div>notes: {report.notes.join("; ")}</div>}
-          </div>
-        </Banner>
+        <div className="mt-3.5">
+          <Banner kind={report.status === "PASS" ? "success" : "error"} title={`Downgrade ${report.status}`}>
+            <div className="space-y-0.5 font-mono text-[11.5px] leading-relaxed">
+              <div>account {report.dbAccountId} · sub {report.dbSubscriptionId}</div>
+              <div>renewal {report.oldRenewalDate} → {report.newRenewalDate}</div>
+              <div>old stripe sub {report.oldStripeSubscriptionId ?? "-"}</div>
+              <div>new active sub {report.newStripeSubscriptionId ?? "-"}</div>
+              {report.notes.length > 0 && <div>notes: {report.notes.join("; ")}</div>}
+            </div>
+          </Banner>
+        </div>
       )}
     </div>
   );
