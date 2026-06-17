@@ -60,6 +60,14 @@ function accountSwitcher(page: Page): Locator {
   return page.getByRole("button", { name: /account options and switcher/i }).first();
 }
 
+// In UI mode (hooks.onStatus is set) there is no terminal to prompt, so a manual
+// fallback must FAIL clearly (surfaced as a red banner) rather than block forever
+// on stdin. In CLI mode, pause and let the user resolve it manually.
+async function manualStep(message: string, hooks: StripeFlowHooks): Promise<void> {
+  if (hooks.onStatus) throw new Error(message.replace(/,\s*$/, "."));
+  await promptEnterWhenReady(message);
+}
+
 async function ensureLoggedIn(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
   await page.goto(cfg.stripe.dashboardUrl, { waitUntil: "domcontentloaded" });
   const needsLogin = /\/login|\/signin|authenticate/i.test(page.url()) || (await accountSwitcher(page).count()) === 0;
@@ -77,7 +85,7 @@ async function ensureLoggedIn(page: Page, cfg: AppConfig, hooks: StripeFlowHooks
 
 // Step 3-4: ensure the configured environment is selected. If the env name is
 // blank, skip (assume the saved session is already on the right environment).
-export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig): Promise<void> {
+export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
   if (!cfg.stripe.environmentName) return;
   const switcher = accountSwitcher(page);
   const name = (await switcher.getAttribute("aria-label").catch(() => null)) ?? "";
@@ -89,14 +97,12 @@ export async function ensureEnvironmentSelected(page: Page, cfg: AppConfig): Pro
     await option.click();
     await page.waitForLoadState("domcontentloaded").catch(() => undefined);
   } else {
-    await promptEnterWhenReady(
-      `Could not auto-select environment "${cfg.stripe.environmentName}". Select it manually,`,
-    );
+    await manualStep(`Could not auto-select environment "${cfg.stripe.environmentName}". Select it manually,`, hooks);
   }
 }
 
 // Steps 5-7: switch into a sandbox / Test mode. Detected by "/test/" in the URL.
-export async function ensureTestMode(page: Page): Promise<void> {
+export async function ensureTestMode(page: Page, hooks: StripeFlowHooks = {}): Promise<void> {
   if (page.url().includes("/test/")) return;
 
   await accountSwitcher(page).click();
@@ -104,15 +110,18 @@ export async function ensureTestMode(page: Page): Promise<void> {
   if (await switchToSandbox.isVisible().catch(() => false)) {
     await switchToSandbox.click(); // opens the sandbox submenu
   } else {
-    await promptEnterWhenReady("Could not find 'Switch to sandbox'. Switch to Test mode manually,");
+    await manualStep("Could not find 'Switch to sandbox'. Switch to Test mode manually,", hooks);
     return;
   }
 
-  const testMode = page.getByRole("menuitem", { name: /^test mode$/i }).first();
+  // The submenu item's accessible name is "T Test mode" (avatar letter prefix),
+  // so match a contained "test mode", and wait for the submenu to render.
+  const testMode = page.getByRole("menuitem", { name: /test mode/i }).first();
+  await testMode.waitFor({ state: "visible", timeout: 8000 }).catch(() => undefined);
   if (await testMode.isVisible().catch(() => false)) {
     await testMode.click();
   } else {
-    await promptEnterWhenReady("Could not find the 'Test mode' option. Select it manually,");
+    await manualStep("Could not find the 'Test mode' option. Select it manually,", hooks);
     return;
   }
   await page.waitForURL(/\/test\//, { timeout: 30000 }).catch(() => undefined);
@@ -120,7 +129,7 @@ export async function ensureTestMode(page: Page): Promise<void> {
 
 // Step 8-10: open the Customers list, search the email, open the customer.
 // Returns the Stripe customer id parsed from the URL (cus_...).
-export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: string): Promise<string | null> {
+export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: string, hooks: StripeFlowHooks = {}): Promise<string | null> {
   await page.getByRole("link", { name: /^customers$/i }).first().click();
   await page.waitForLoadState("domcontentloaded").catch(() => undefined);
 
@@ -133,7 +142,7 @@ export async function openCustomerByEmail(page: Page, cfg: AppConfig, email: str
     await customerLink.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs });
     await customerLink.click();
   } catch {
-    await promptEnterWhenReady(`Could not auto-open customer "${email}". Open it manually,`);
+    await manualStep(`Could not auto-open customer "${email}". Open it manually,`, hooks);
   }
   await page.waitForURL(/\/customers\/cus_/, { timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   await shot(page, "customer-opened");
@@ -154,7 +163,7 @@ export async function waitForCollectionPaused(page: Page, cfg: AppConfig): Promi
 }
 
 // Step 12: open the subscription from the customer page. Returns its sub_ id.
-export async function openPausedSubscription(page: Page, cfg: AppConfig): Promise<string | null> {
+export async function openPausedSubscription(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<string | null> {
   const link = page.locator('a[href*="/subscriptions/sub_"]').first();
   let id: string | null = null;
   if (await link.isVisible().catch(() => false)) {
@@ -162,21 +171,21 @@ export async function openPausedSubscription(page: Page, cfg: AppConfig): Promis
     await link.click();
     await page.waitForURL(/\/subscriptions\/sub_/, { timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   } else {
-    await promptEnterWhenReady("Could not auto-open the paused subscription. Open it manually,");
+    await manualStep("Could not auto-open the paused subscription. Open it manually,", hooks);
     id = page.url().match(/subscriptions\/(sub_[A-Za-z0-9]+)/)?.[1] ?? null;
   }
   return id;
 }
 
 // Step 13: open the Run simulation dialog (test clock). Returns the dialog locator.
-export async function runSimulation(page: Page, cfg: AppConfig): Promise<Locator> {
+export async function runSimulation(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<Locator> {
   const dialog = page.getByRole("alertdialog", { name: /run simulation/i });
   if (!(await dialog.isVisible().catch(() => false))) {
     const btn = page.getByRole("button", { name: /^run simulation$/i }).first();
     if (await btn.isVisible().catch(() => false)) {
       await btn.click();
     } else {
-      await promptEnterWhenReady("Could not find 'Run simulation'. Open the simulation dialog manually,");
+      await manualStep("Could not find 'Run simulation'. Open the simulation dialog manually,", hooks);
     }
     await dialog.waitFor({ state: "visible", timeout: cfg.stripe.stepTimeoutMs }).catch(() => undefined);
   }
@@ -211,8 +220,8 @@ function presetCandidate(from: Date, label: string): Date {
 
 // Steps 14-15: advance the test clock toward (current clock + span), looping
 // across the per-step cap, waiting for each advance to complete.
-export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: ParsedSpan): Promise<void> {
-  let dialog = await runSimulation(page, cfg);
+export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: ParsedSpan, hooks: StripeFlowHooks = {}): Promise<void> {
+  let dialog = await runSimulation(page, cfg, hooks);
   const clockStart = (await readSelectedDate(dialog)) ?? new Date();
   const target = addSpan(clockStart, span);
 
@@ -255,7 +264,7 @@ export async function advanceClockBySpan(page: Page, cfg: AppConfig, span: Parse
     if (reachedDate.getTime() >= target.getTime()) break;
 
     // Reopen the dialog for the next step (the cap will have moved forward).
-    dialog = await runSimulation(page, cfg);
+    dialog = await runSimulation(page, cfg, hooks);
   }
   await shot(page, "simulation-completed");
 }
@@ -326,12 +335,12 @@ export async function runStripeSimulation(
     status("login", "Ensuring Stripe login…");
     await ensureLoggedIn(page, cfg, hooks);
     status("environment", "Ensuring correct environment is selected…");
-    await ensureEnvironmentSelected(page, cfg);
+    await ensureEnvironmentSelected(page, cfg, hooks);
     status("testmode", "Ensuring Test mode is active…");
-    await ensureTestMode(page);
+    await ensureTestMode(page, hooks);
 
     status("customer", "Opening customer by email…");
-    const stripeCustomerId = await openCustomerByEmail(page, cfg, input.email);
+    const stripeCustomerId = await openCustomerByEmail(page, cfg, input.email, hooks);
     if (input.expectedStripeCustomerId && stripeCustomerId &&
         input.expectedStripeCustomerId !== stripeCustomerId) {
       notes.push(`DB stripeCustomerId (${input.expectedStripeCustomerId}) != opened customer (${stripeCustomerId}).`);
@@ -342,13 +351,16 @@ export async function runStripeSimulation(
     if (!collectionPausedSeen) notes.push("Collection Paused tag was not observed.");
 
     status("subscription", "Opening paused subscription…");
-    const oldStripeSubscriptionId = await openPausedSubscription(page, cfg);
+    const oldStripeSubscriptionId = await openPausedSubscription(page, cfg, hooks);
     if (input.expectedStripeSubscriptionId && oldStripeSubscriptionId &&
         input.expectedStripeSubscriptionId !== oldStripeSubscriptionId) {
       notes.push(
         `DB subscriptionId (${input.expectedStripeSubscriptionId}) != opened subscription (${oldStripeSubscriptionId}).`,
       );
-      await promptEnterWhenReady("DB/Stripe subscription id mismatch (see note). Verify this is the right subscription,");
+      // A mismatch is a warning, not fatal. Only pause (CLI); in UI mode just note it.
+      if (!hooks.onStatus) {
+        await promptEnterWhenReady("DB/Stripe subscription id mismatch (see note). Verify this is the right subscription,");
+      }
     }
 
     const targetIso = addSpan(new Date(), input.span).toISOString();
@@ -367,7 +379,7 @@ export async function runStripeSimulation(
     }
 
     status("advancing", "Advancing Stripe test clock…");
-    await advanceClockBySpan(page, cfg, input.span);
+    await advanceClockBySpan(page, cfg, input.span, hooks);
 
     status("verifying", "Verifying active subscription after advance…");
     const verify = await verifyActiveSubscriptionForEmail(
