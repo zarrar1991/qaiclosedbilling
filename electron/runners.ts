@@ -1,10 +1,11 @@
 import type { AppConfig, RunReport } from "../src/types.js";
-import { createPool, lookupAccountId, fetchSubscriptions, fetchAllSubscriptions, fetchCampaigns, updateRenewal, reselectByIds } from "../src/db.js";
+import { createPool, lookupAccountId, lookupUserId, insertPaymentMethod, fetchSubscriptions, fetchAllSubscriptions, fetchCampaigns, updateRenewal, reselectByIds } from "../src/db.js";
 import type { Campaign } from "../src/types.js";
 import { chooseTargetSubscription } from "../src/selection.js";
 import { computeRenewalUTC, parseSpan } from "../src/time.js";
 import { runStripeSimulation } from "../src/stripe-flow.js";
-import type { RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, FullFlowProgress, SubscriptionSearchResult } from "./ipc.js";
+import { runZeroFundsFlow } from "../src/zerofunds-flow.js";
+import type { RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, FullFlowProgress, SubscriptionSearchResult, ZeroFundsRequest, ZeroFundsResult, ZeroFundsProgress } from "./ipc.js";
 
 export async function getRenewalCandidates(cfg: AppConfig, email: string): Promise<RenewalCandidates> {
   const pool = createPool(cfg);
@@ -125,6 +126,47 @@ export async function runFullFlowUi(
     };
     onProgress({ step: "done", message: `Done: ${report.status}` });
     return report;
+  } finally {
+    await pool.end().catch(() => undefined);
+  }
+}
+
+export async function runZeroFundsUi(
+  cfg: AppConfig,
+  req: ZeroFundsRequest,
+  onProgress: (p: ZeroFundsProgress) => void,
+): Promise<ZeroFundsResult> {
+  const pool = createPool(cfg);
+  try {
+    const flow = await runZeroFundsFlow(cfg, req, {
+      onStatus: (step, message) => onProgress({ step, message }),
+      waitForLogin: async (page) => {
+        await page
+          .getByRole("button", { name: /account options and switcher/i })
+          .first()
+          .waitFor({ state: "visible", timeout: cfg.stripe.longTimeoutMs });
+      },
+    });
+
+    onProgress({ step: "DB", message: "Recording payment method in the database…" });
+    const accountId = await lookupAccountId(pool, req.email);
+    if (!accountId) throw new Error(`No account found for email ${req.email}`);
+    const userId = await lookupUserId(pool, req.email);
+    if (!userId) throw new Error(`No user found for email ${req.email}`);
+    if (!flow.paymentMethodId) throw new Error("No Stripe payment method id was captured.");
+    const dbPaymentMethodId = await insertPaymentMethod(pool, {
+      accountId, userId, stripePaymentMethodId: flow.paymentMethodId, type: "card",
+    });
+
+    onProgress({ step: "DONE", message: `Done${flow.verified ? "" : " (app card not confirmed)"}.` });
+    return {
+      stripeCustomerId: flow.stripeCustomerId,
+      paymentMethodId: flow.paymentMethodId,
+      dbPaymentMethodId,
+      appCardLast4: flow.appCardLast4,
+      verified: flow.verified,
+      notes: flow.notes,
+    };
   } finally {
     await pool.end().catch(() => undefined);
   }

@@ -8,8 +8,8 @@ import { parseConfig } from "../src/config.js";
 import { createPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
 import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
-import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress, type CampaignLink } from "./ipc.js";
-import { getRenewalCandidates, searchSubscriptionsUi, listCampaignsUi, updateRenewalUi, runFullFlowUi } from "./runners.js";
+import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress, type CampaignLink, type ZeroFundsRequest } from "./ipc.js";
+import { getRenewalCandidates, searchSubscriptionsUi, listCampaignsUi, updateRenewalUi, runFullFlowUi, runZeroFundsUi } from "./runners.js";
 import type { AppConfig } from "../src/types.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -226,6 +226,9 @@ ipcMain.handle(CH.renewalUpdate, (_e, p: { profile: string; req: RenewalUpdateRe
 );
 ipcMain.handle(CH.fullflowRun, (e, p: { profile: string; email: string; span: string }) =>
   wrap(() => runFullFlowUi(loadCfg(p.profile), p.email, p.span, (pr) => e.sender.send(CH.fullflowProgress, pr))),
+);
+ipcMain.handle(CH.zerofundsRun, (e, p: { profile: string; req: ZeroFundsRequest }) =>
+  wrap(() => runZeroFundsUi(loadCfg(p.profile), p.req, (pr) => e.sender.send(CH.zerofundsProgress, pr))),
 );
 
 // --- Create iClosed user (in-process; streams onProgress to the renderer) ---
