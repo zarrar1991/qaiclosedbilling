@@ -10,6 +10,7 @@ const DB_KEYS = ["PGHOST", "PGPORT", "PGDATABASE", "PGUSER", "PGPASSWORD", "PGSS
 const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_AUTH_PROFILE_DIR",
   "STRIPE_STEP_TIMEOUT_MS", "STRIPE_LONG_TIMEOUT_MS", "DEFAULT_RENEWAL_OFFSET_MINUTES", "PLAYWRIGHT_SLOW_MO_MS"];
 const BO_KEYS = ["BO_BASE_URL", "BO_EMAIL", "BO_PASSWORD"];
+const APP_KEYS = ["ICLOSED_APP_URL"];
 
 export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void }) {
   const toast = useToast();
@@ -161,6 +162,7 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
       {section("Database", DB_KEYS, "PGPASSWORD")}
       {section("Stripe", STRIPE_KEYS)}
       {section("Back Office API", BO_KEYS, "BO_PASSWORD")}
+      {section("Application", APP_KEYS)}
 
       <div className="mt-[22px] flex gap-2.5 border-t border-[#EEF0F3] pt-[18px]">
         <button onClick={save} disabled={!selected} className="ic-btn-primary px-5 py-2 text-[13px]">Save</button>
