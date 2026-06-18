@@ -1,4 +1,4 @@
-import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, SubscriptionSearchResult, ProfilesList, IClosedCreateRequest, IClosedResult, IClosedProgress } from "../../electron/ipc.js";
+import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateResult, SubscriptionSearchResult, ProfilesList, IClosedCreateRequest, IClosedResult, IClosedProgress, ZeroFundsRequest, ZeroFundsResult, ZeroFundsProgress } from "../../electron/ipc.js";
 import type { RunReport, Campaign, CampaignLink } from "../../src/types.js";
 
 interface Api {
@@ -26,5 +26,8 @@ interface Api {
   windowMinimize(): Promise<void>;
   windowMaximize(): Promise<void>;
   windowClose(): Promise<void>;
+  // Add zero funds card
+  runZeroFunds(profile: string, req: ZeroFundsRequest): Promise<IpcResult<ZeroFundsResult>>;
+  onZeroFundsProgress(cb: (p: ZeroFundsProgress) => void): () => void;
 }
 export const api = (window as unknown as { api: Api }).api;

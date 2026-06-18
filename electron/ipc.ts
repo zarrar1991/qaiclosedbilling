@@ -39,6 +39,18 @@ export interface IClosedProgress {
   result?: IClosedResult;
 }
 
+// Add zero funds card (Stripe dashboard zero-funds card + DB row + app Billing card).
+export interface ZeroFundsRequest { email: string; password: string }
+export interface ZeroFundsResult {
+  stripeCustomerId: string | null;
+  paymentMethodId: string | null;
+  dbPaymentMethodId: string | null;
+  appCardLast4: string | null;
+  verified: boolean;
+  notes: string[];
+}
+export interface ZeroFundsProgress { step: string; message: string }
+
 export const CH = {
   profilesList: "profiles:list",
   profilesGet: "profiles:get",
@@ -60,4 +72,6 @@ export const CH = {
   windowMinimize: "window:minimize",
   windowMaximize: "window:maximize",
   windowClose: "window:close",
+  zerofundsRun: "zerofunds:run",
+  zerofundsProgress: "zerofunds:progress",
 } as const;

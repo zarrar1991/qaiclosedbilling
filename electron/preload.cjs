@@ -24,6 +24,8 @@ const CH = {
   windowMinimize: "window:minimize",
   windowMaximize: "window:maximize",
   windowClose: "window:close",
+  zerofundsRun: "zerofunds:run",
+  zerofundsProgress: "zerofunds:progress",
 };
 
 contextBridge.exposeInMainWorld("api", {
@@ -59,4 +61,11 @@ contextBridge.exposeInMainWorld("api", {
   windowMinimize: () => ipcRenderer.invoke(CH.windowMinimize),
   windowMaximize: () => ipcRenderer.invoke(CH.windowMaximize),
   windowClose: () => ipcRenderer.invoke(CH.windowClose),
+  // Add zero funds card
+  runZeroFunds: (profile, req) => ipcRenderer.invoke(CH.zerofundsRun, { profile, req }),
+  onZeroFundsProgress: (cb) => {
+    const listener = (_e, p) => cb(p);
+    ipcRenderer.on(CH.zerofundsProgress, listener);
+    return () => ipcRenderer.removeListener(CH.zerofundsProgress, listener);
+  },
 });
