@@ -7,6 +7,7 @@ import { Renewal } from "./pages/Renewal.js";
 import { FullDowngrade } from "./pages/FullDowngrade.js";
 import { CreateUser } from "./pages/CreateUser.js";
 import { Settings } from "./pages/Settings.js";
+import { ZeroFundsCard } from "./pages/ZeroFundsCard.js";
 import { api } from "./lib/api.js";
 
 export default function App() {
@@ -53,6 +54,7 @@ export default function App() {
               {page === "full" && <FullDowngrade profile={profile} />}
               {page === "createuser" && <CreateUser profile={profile} />}
               {page === "settings" && <Settings onProfilesChanged={loadProfiles} />}
+              {page === "zerofunds" && <ZeroFundsCard profile={profile} />}
             </main>
           </div>
         </div>
