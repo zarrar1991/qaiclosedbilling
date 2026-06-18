@@ -22,6 +22,8 @@ function bool(value: string | undefined, fallback: boolean): boolean {
 export function parseConfig(env: Env): AppConfig {
   const missing: string[] = [];
   const cfg: AppConfig = {
+    // Optional: iClosed app base URL for the app-side flows. Default to dev.
+    appUrl: (env.ICLOSED_APP_URL?.trim() || "https://dev.iclosed.io").replace(/\/+$/, ""),
     pg: {
       host: required(env, "PGHOST", missing),
       port: num(required(env, "PGPORT", missing), 5432),

@@ -1,4 +1,5 @@
 export interface AppConfig {
+  appUrl: string;
   pg: {
     host: string;
     port: number;

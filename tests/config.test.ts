@@ -39,4 +39,14 @@ describe("parseConfig", () => {
   it("throws listing all missing required vars", () => {
     expect(() => parseConfig({})).toThrow(/PGHOST/);
   });
+
+  it("defaults appUrl to https://dev.iclosed.io when ICLOSED_APP_URL unset", () => {
+    const cfg = parseConfig({ ...base });
+    expect(cfg.appUrl).toBe("https://dev.iclosed.io");
+  });
+
+  it("uses ICLOSED_APP_URL and trims trailing slashes", () => {
+    const cfg = parseConfig({ ...base, ICLOSED_APP_URL: "https://app.example.com/" });
+    expect(cfg.appUrl).toBe("https://app.example.com");
+  });
 });
