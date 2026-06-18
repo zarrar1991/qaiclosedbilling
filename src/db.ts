@@ -44,6 +44,27 @@ export async function lookupAccountId(pool: pg.Pool, email: string): Promise<str
   return res.rows.length ? String(res.rows[0].id) : null;
 }
 
+export async function lookupUserId(pool: pg.Pool, email: string): Promise<string | null> {
+  const sql = `SELECT id FROM users WHERE email = $1;`;
+  logQuery(sql, [email]);
+  const res = await pool.query(sql, [email]);
+  return res.rows.length ? String(res.rows[0].id) : null;
+}
+
+// Insert a payment method row. Only the four columns below are set; id,
+// createdAt and updatedAt are auto-populated by the DB and deletedAt defaults NULL.
+export async function insertPaymentMethod(
+  pool: pg.Pool,
+  values: { accountId: string; userId: string; stripePaymentMethodId: string; type?: string },
+): Promise<string> {
+  const sql = `INSERT INTO payment_methods ("accountId","userId","stripePaymentMethodId","type")
+    VALUES ($1,$2,$3,$4) RETURNING id;`;
+  const params = [Number(values.accountId), Number(values.userId), values.stripePaymentMethodId, values.type ?? "card"];
+  logQuery(sql, params);
+  const res = await pool.query(sql, params);
+  return String(res.rows[0].id);
+}
+
 // Schema: icloseddevdb.subscriptions (resolved via search_path). The Stripe
 // subscription id is stored in the "subscriptionId" column (aliased below).
 // There is no stripeCustomerId column in this schema.
