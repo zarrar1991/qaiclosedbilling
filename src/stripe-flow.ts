@@ -70,7 +70,7 @@ async function manualStep(message: string, hooks: StripeFlowHooks): Promise<void
   await promptEnterWhenReady(message);
 }
 
-async function ensureLoggedIn(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
+export async function ensureLoggedIn(page: Page, cfg: AppConfig, hooks: StripeFlowHooks = {}): Promise<void> {
   await page.goto(cfg.stripe.dashboardUrl, { waitUntil: "domcontentloaded" });
   const needsLogin = /\/login|\/signin|authenticate/i.test(page.url()) || (await accountSwitcher(page).count()) === 0;
   if (!needsLogin) return;
