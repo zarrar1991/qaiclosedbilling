@@ -26,8 +26,9 @@ behaviors are unchanged; this is additive.
 - **Stripe session:** reuse the existing persistent `.auth` profile + login/env/test-mode
   helpers (no re-login each run).
 - **`payment_methods` schema:** `id` (auto-increment PK — omitted from INSERT), `accountId`,
-  `userId`, `stripePaymentMethodId`, `type` (`'card'`), `createdAt`, `updatedAt`, `deletedAt`
-  (left NULL). `createdAt`/`updatedAt` set to a UTC timestamp matching the app convention.
+  `userId`, `stripePaymentMethodId`, `type` (`'card'`), `createdAt`, `updatedAt`, `deletedAt`.
+  The INSERT sets **only** `accountId`, `userId`, `stripePaymentMethodId`, `type` —
+  `id`/`createdAt`/`updatedAt` are auto-populated by the DB and `deletedAt` defaults to NULL.
 - **Billing add-card** is the internal iClosed Billing page — **different selectors** from
   the signup embedded-checkout iframe; discovered separately.
 
@@ -90,8 +91,8 @@ Progress streams main → renderer over `zerofunds:progress`, rendered by the ex
 **C. DB (new helpers in `src/db.ts`):**
 - `lookupUserId(pool, email)` → `SELECT id FROM users WHERE email = $1`.
 - `insertPaymentMethod(pool, { accountId, userId, stripePaymentMethodId, type })`:
-  `INSERT INTO payment_methods ("accountId","userId","stripePaymentMethodId","type","createdAt","updatedAt")
-   VALUES ($1,$2,$3,$4,$5,$5) RETURNING id;` where `$5` is a UTC timestamp string.
+  `INSERT INTO payment_methods ("accountId","userId","stripePaymentMethodId","type")
+   VALUES ($1,$2,$3,$4) RETURNING id;` (`id`/`createdAt`/`updatedAt` auto-populated).
 - Orchestrator: `accountId = lookupAccountId(email)`, `userId = lookupUserId(email)`,
   `dbPaymentMethodId = insertPaymentMethod(...)`. Errors if either id is missing.
 
@@ -156,8 +157,8 @@ UI-mode fallbacks fail with a clear message (no terminal prompt), like `manualSt
 - **Unseen DOM:** the Stripe dashboard add-card modal (incl. the ID field) and the internal
   iClosed Billing add-card form are not yet known. Selectors discovered iteratively in headed
   mode with waits/screenshots; expect a debug pass to finalize.
-- **`payment_methods.id`** assumed auto-increment; if it is not, the INSERT must supply an id
-  (surfaces immediately as a clear DB error).
+- **`payment_methods.id`** assumed auto-increment and `createdAt`/`updatedAt` auto-populated;
+  if not, the INSERT errors clearly and we add the missing column(s).
 
 ## Out of scope
 
