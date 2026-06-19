@@ -146,23 +146,21 @@ export async function runZeroFundsUi(
           .first()
           .waitFor({ state: "visible", timeout: cfg.stripe.longTimeoutMs });
       },
+      // Insert the captured pm_ into payment_methods (between the dashboard and
+      // app-Billing phases).
+      recordPaymentMethod: async (paymentMethodId) => {
+        const accountId = await lookupAccountId(pool, req.email);
+        if (!accountId) throw new Error(`No account found for email ${req.email}`);
+        const userId = await lookupUserId(pool, req.email);
+        if (!userId) throw new Error(`No user found for email ${req.email}`);
+        return insertPaymentMethod(pool, { accountId, userId, stripePaymentMethodId: paymentMethodId, type: "card" });
+      },
     });
 
-    onProgress({ step: "DB", message: "Recording payment method in the database…" });
-    const accountId = await lookupAccountId(pool, req.email);
-    if (!accountId) throw new Error(`No account found for email ${req.email}`);
-    const userId = await lookupUserId(pool, req.email);
-    if (!userId) throw new Error(`No user found for email ${req.email}`);
-    if (!flow.paymentMethodId) throw new Error("No Stripe payment method id was captured.");
-    const dbPaymentMethodId = await insertPaymentMethod(pool, {
-      accountId, userId, stripePaymentMethodId: flow.paymentMethodId, type: "card",
-    });
-
-    onProgress({ step: "DONE", message: `Done${flow.verified ? "" : " (app card not confirmed)"}.` });
     return {
       stripeCustomerId: flow.stripeCustomerId,
       paymentMethodId: flow.paymentMethodId,
-      dbPaymentMethodId,
+      dbPaymentMethodId: flow.dbPaymentMethodId,
       appCardLast4: flow.appCardLast4,
       verified: flow.verified,
       notes: flow.notes,
