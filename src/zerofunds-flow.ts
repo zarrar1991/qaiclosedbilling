@@ -150,8 +150,14 @@ export async function addCardOnAppBilling(
   const [mm, yy] = randomFutureExpiry().split("/");
   await addPaymentMethod(base, token, { number: APP_CARD, exp_month: Number(mm), exp_year: Number(yy), cvc: randomCvc() });
 
+  // The new card can take a moment to appear in GET /paymentMethods, so poll.
   const wanted = last4(APP_CARD); // "5556"
-  const verified = (await listPaymentMethods(base, token)).some((c) => c.last4 === wanted);
+  const deadline = Date.now() + cfg.stripe.stepTimeoutMs;
+  let verified = false;
+  while (Date.now() < deadline) {
+    if ((await listPaymentMethods(base, token)).some((c) => c.last4 === wanted)) { verified = true; break; }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
   return { last4: wanted, verified };
 }
 
