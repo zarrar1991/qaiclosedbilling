@@ -16,3 +16,6 @@ debug/
 
 # design handoff bundle + local QA screenshots (not source)
 .design-tmp/
+
+# HAR-capture browser profile (transient)
+.har-profile/
