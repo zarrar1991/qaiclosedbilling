@@ -1,5 +1,6 @@
 export interface AppConfig {
   appUrl: string;
+  boBaseUrl: string;
   pg: {
     host: string;
     port: number;

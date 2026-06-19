@@ -24,6 +24,8 @@ export function parseConfig(env: Env): AppConfig {
   const cfg: AppConfig = {
     // Optional: iClosed app base URL for the app-side flows. Default to dev.
     appUrl: (env.ICLOSED_APP_URL?.trim() || "https://dev.iclosed.io").replace(/\/+$/, ""),
+    // Back-office API base (same endpoint family used for campaign links + auth).
+    boBaseUrl: (env.BO_BASE_URL?.trim() || "").replace(/\/+$/, ""),
     pg: {
       host: required(env, "PGHOST", missing),
       port: num(required(env, "PGPORT", missing), 5432),

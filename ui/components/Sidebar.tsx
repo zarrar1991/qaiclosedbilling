@@ -21,8 +21,8 @@ const ITEMS: { id: Page; label: string }[] = [
   { id: "createuser", label: "Create user" },
   { id: "renewal", label: "Update renewal date" },
   { id: "full", label: "Downgrade subscription" },
-  { id: "settings", label: "Settings" },
   { id: "zerofunds", label: "Add zero funds card" },
+  { id: "settings", label: "Settings" },
 ];
 
 export function Sidebar({ page, setPage }: { page: Page; setPage: (p: Page) => void }) {
