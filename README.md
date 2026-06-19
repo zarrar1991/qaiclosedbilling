@@ -54,18 +54,24 @@ npm start            # or double-click run.bat on Windows
 ### Build installers
 
 ```
-# Windows (.exe), run on Windows:
-set PLAYWRIGHT_BROWSERS_PATH=%USERPROFILE%\AppData\Local\ms-playwright
-npx playwright install chromium
-npm run app:build
+# Windows (.exe) — on Windows:
+npm run app:build:win        # → release/iClosed Billing Setup 1.0.0.exe
 
-# macOS (.dmg), run on a Mac:
-export PLAYWRIGHT_BROWSERS_PATH="$HOME/Library/Caches/ms-playwright"
-npx playwright install chromium
-npm run app:build
+# macOS (.dmg) — on a Mac:
+npm run app:build:mac        # → release/iClosed Billing-1.0.0.dmg
+#   or double-click build-macos.command (one-click: install → playwright → build)
 ```
 
+**macOS:** see **[README-macos.md](README-macos.md)** for the full Mac build guide.
+
 Notes:
-- The Stripe automation opens its own headed Chromium window — log in once (the session is saved per user).
 - `.dmg` can only be built on macOS; `.exe` on Windows.
-- In packaged builds, `.env` and the `.auth` Stripe profile live under the app's user-data directory, so each user configures their own credentials in the Settings page on first run.
+- **Runtime needs Google Chrome installed** — the Create-user flow and the zero-funds
+  app-login step drive system Chrome (`channel:'chrome'`); the Stripe/downgrade flow uses
+  Playwright's Chromium (`npx playwright install chromium`).
+- Builds are **unsigned**, so the first launch warns: on macOS (Gatekeeper) right-click →
+  **Open**, or `xattr -d com.apple.quarantine "iClosed Billing.app"`; on Windows
+  (SmartScreen) **More info → Run anyway**.
+- The Stripe automation opens its own headed window — log in once (saved per user).
+- In packaged builds, `.env` and the `.auth` Stripe profile live under the app's user-data
+  directory, so each user configures their own credentials in the Settings page on first run.
