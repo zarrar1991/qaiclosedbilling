@@ -250,6 +250,31 @@ async function createEventAndFinish(page, companyName, onProgress) {
 // Click a control (button OR link, by accessible-name regex) once it is both
 // visible and enabled. Handles native `disabled` as well as aria-disabled
 // custom buttons. Many "Skip" controls render as links rather than buttons.
+// The onboarding route guard intermittently (~1/10) bounces back to
+// /questionnaire when a prior step's async save (event-creation / userOnboarding)
+// hasn't committed yet. The bounce is a LATE redirect — it can fire after
+// advanceTo() already saw the destination slug — so a pre-click wait can't prevent
+// it. Instead: run the onboarding chain, and if it fails while we've been bounced
+// to /questionnaire, let in-flight saves settle, re-enter onboarding-1 from the
+// welcome "Next", and retry the chain.
+async function createEventAndFinishWithRetry(page, username, onProgress, maxAttempts = 3) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      await createEventAndFinish(page, username, onProgress);
+      return;
+    } catch (err) {
+      const bounced = /\/questionnaire\b/.test(page.url());
+      if (attempt >= maxAttempts || !bounced) throw err;
+      log(onProgress, 'Onboarding bounced to questionnaire — recovering', { attempt, error: err.message, url: page.url() });
+      await page.waitForLoadState('networkidle', { timeout: 8000 }).catch(() => {});
+      await syncPage(page);
+      // The welcome form persists across the bounce, so just re-enter onboarding-1.
+      await clickWhenEnabled(page, /Next:?\s*Create your event/i);
+      await advanceTo(page, onProgress, 'onboarding-1', `retry-${attempt}-after-next-create-event`);
+    }
+  }
+}
+
 async function clickWhenEnabled(page, nameRe, timeout = DEFAULT_TIMEOUT) {
   const target = page
     .getByRole('button', { name: nameRe })
@@ -382,7 +407,7 @@ async function createIClosedUser(opts) {
     await fillWelcomeScreen(page, username, onProgress);
 
     log(onProgress, 'Creating event and finishing setup');
-    await createEventAndFinish(page, username, onProgress);
+    await createEventAndFinishWithRetry(page, username, onProgress);
 
     const result = {
       email,
