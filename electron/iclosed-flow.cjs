@@ -206,9 +206,20 @@ async function fillWelcomeScreen(page, username, onProgress) {
 
 async function createEventAndFinish(page, companyName, onProgress) {
   // Step 2/6 (onboarding-1): event template — VSL Funnel is pre-selected.
-  // "Create and test event" does async work on this URL for a few seconds
-  // ("Event saved") before navigating, so advanceTo waits for onboarding-2.
+  // "Create and test event" fires the async event creation (POST /events/v2 +
+  // /events/public + /eventDates). The onboarding-3 guard REQUIRES that event to
+  // exist; waiting only for the URL slug lets us advance before it commits, so the
+  // guard bounces back to /questionnaire (the dominant ~8/10 failure). Gate the
+  // advance on the event-creation POST actually completing. Non-fatal: if the call
+  // shape changes, fall through to the slug wait (+ retry wrapper) below.
+  const eventCreated = page
+    .waitForResponse(
+      (r) => /\/events\/(v2|public)\b/.test(r.url()) && r.request().method() === 'POST' && r.ok(),
+      { timeout: PAYMENT_TIMEOUT },
+    )
+    .catch(() => null);
   await clickWhenEnabled(page, /Create and test event/i);
+  await eventCreated;
   await advanceTo(page, onProgress, 'onboarding-2', 'after-create-and-test-event');
 
   // Step 3/6 (onboarding-2): scheduler tutorial. It embeds a live scheduler demo
