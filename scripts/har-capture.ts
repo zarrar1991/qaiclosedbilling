@@ -5,6 +5,7 @@ import { appendFileSync, mkdirSync, writeFileSync } from "node:fs";
 import { chromium, type Request } from "playwright";
 
 const label = process.argv[2] || "capture";
+const startUrl = process.argv[3] || "https://dev.iclosed.io/auth/login";
 mkdirSync("artifacts", { recursive: true });
 const out = `artifacts/${label}.ndjson`;
 writeFileSync(out, "");
@@ -43,9 +44,9 @@ function pickHeaders(h: Record<string, string>): Record<string, string> {
   });
 
   const page = await ctx.newPage();
-  await page.goto("https://dev.iclosed.io/auth/login").catch(() => undefined);
-  console.log(`\n▶ Recording API calls → ${out}`);
-  console.log("  Log in → add card in the opened window, then CLOSE the window.\n");
+  await page.goto(startUrl).catch(() => undefined);
+  console.log(`\n▶ Recording API calls → ${out}  (start: ${startUrl})`);
+  console.log("  Drive the flow in the opened window, then CLOSE the window.\n");
   await new Promise<void>((res) => browser.on("disconnected", () => res()));
   console.log(`✓ Done → ${out}`);
 })().catch((e) => { console.error("CAPTURE FAILED", e instanceof Error ? e.message : e); process.exit(1); });
