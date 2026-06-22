@@ -8,18 +8,28 @@ const { Pool } = pg;
 // and compared exactly as stored (the app treats these as UTC wall-clock).
 pg.types.setTypeParser(1114, (v) => v);
 
-export function createPool(cfg: AppConfig): pg.Pool {
+export interface PgSettings {
+  host: string; port: number; database: string; user: string; password: string; sslmode: string; schema: string;
+}
+
+// Build a pool from raw pg settings — used both by createPool (from AppConfig) and
+// by "Test DB connection" against the Settings form's *current* values.
+export function createPgPool(s: PgSettings): pg.Pool {
   return new Pool({
-    host: cfg.pg.host,
-    port: cfg.pg.port,
-    database: cfg.pg.database,
-    user: cfg.pg.user,
-    password: cfg.pg.password,
-    ssl: cfg.pg.sslmode === "disable" ? false : { rejectUnauthorized: cfg.pg.sslmode === "verify-full" },
+    host: s.host,
+    port: s.port,
+    database: s.database,
+    user: s.user,
+    password: s.password,
+    ssl: s.sslmode === "disable" ? false : { rejectUnauthorized: s.sslmode === "verify-full" },
     // Force the schema's search_path when PGSCHEMA is set; otherwise use the
     // DB role's default search_path. Applied at connection startup.
-    ...(cfg.pg.schema ? { options: `-c search_path=${cfg.pg.schema},public` } : {}),
+    ...(s.schema ? { options: `-c search_path=${s.schema},public` } : {}),
   });
+}
+
+export function createPool(cfg: AppConfig): pg.Pool {
+  return createPgPool(cfg.pg);
 }
 
 function logQuery(sql: string, params: unknown[]): void {

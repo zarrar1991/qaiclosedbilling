@@ -10,7 +10,7 @@ interface Api {
   deleteProfile(name: string): Promise<IpcResult<ProfilesList>>;
   setActiveProfile(name: string): Promise<IpcResult<ProfilesList>>;
   // Operations (each takes the selected profile name)
-  testDb(profile: string): Promise<IpcResult<{ connected: boolean }>>;
+  testDb(values: Record<string, string>): Promise<IpcResult<{ connected: boolean }>>;
   getCandidates(profile: string, email: string): Promise<IpcResult<RenewalCandidates>>;
   searchSubscriptions(profile: string, email: string): Promise<IpcResult<SubscriptionSearchResult>>;
   listCampaigns(profile: string): Promise<IpcResult<Campaign[]>>;

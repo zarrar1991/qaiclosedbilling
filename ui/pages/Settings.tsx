@@ -55,8 +55,9 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
   }
 
   async function test() {
-    const r = await api.testDb(selected);
-    if (r.ok) toast("success", "Connection OK", `Connected to the database (${selected}).`);
+    // Test the CURRENT field values (vals), not the saved profile.
+    const r = await api.testDb(vals);
+    if (r.ok) toast("success", "Connection OK", "Connected using the current field values.");
     else toast("error", "Connection failed", humanizeError(r.error));
   }
 

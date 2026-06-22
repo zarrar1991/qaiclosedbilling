@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import https from "node:https";
 import { parseConfig } from "../src/config.js";
-import { createPool } from "../src/db.js";
+import { createPgPool } from "../src/db.js";
 import { readProfiles, writeProfiles } from "../src/profiles.js";
 import { envPath, authProfileDir, bundledChromiumPath, profilesPath } from "./paths.js";
 import { CH, type IpcResult, type RenewalUpdateRequest, type ProfilesList, type IClosedCreateRequest, type IClosedResult, type IClosedProgress, type CampaignLink, type ZeroFundsRequest } from "./ipc.js";
@@ -203,10 +203,19 @@ ipcMain.handle(CH.profilesSetActive, (_e, name: string) =>
   }),
 );
 
-// --- Operations (all take a profile name) ---
-ipcMain.handle(CH.settingsTestDb, (_e, profile: string) =>
+// Test DB connection against the Settings form's CURRENT values (not the saved
+// profile), so it reflects unsaved edits.
+ipcMain.handle(CH.settingsTestDb, (_e, values: Record<string, string>) =>
   wrap(async () => {
-    const pool = createPool(loadCfg(profile));
+    const pool = createPgPool({
+      host: values.PGHOST ?? "",
+      port: Number(values.PGPORT) || 5432,
+      database: values.PGDATABASE ?? "",
+      user: values.PGUSER ?? "",
+      password: values.PGPASSWORD ?? "",
+      sslmode: values.PGSSLMODE || "require",
+      schema: (values.PGSCHEMA ?? "").trim(),
+    });
     try { await pool.query("SELECT 1"); return { connected: true }; }
     finally { await pool.end().catch(() => undefined); }
   }),

@@ -37,7 +37,7 @@ contextBridge.exposeInMainWorld("api", {
   deleteProfile: (name) => ipcRenderer.invoke(CH.profilesDelete, name),
   setActiveProfile: (name) => ipcRenderer.invoke(CH.profilesSetActive, name),
   // Operations (each takes the selected profile name)
-  testDb: (profile) => ipcRenderer.invoke(CH.settingsTestDb, profile),
+  testDb: (values) => ipcRenderer.invoke(CH.settingsTestDb, values),
   getCandidates: (profile, email) => ipcRenderer.invoke(CH.renewalGetCandidates, { profile, email }),
   searchSubscriptions: (profile, email) => ipcRenderer.invoke(CH.subscriptionsSearch, { profile, email }),
   listCampaigns: (profile) => ipcRenderer.invoke(CH.campaignsList, profile),
