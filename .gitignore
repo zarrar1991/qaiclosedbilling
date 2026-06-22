@@ -19,3 +19,6 @@ debug/
 
 # HAR-capture browser profile (transient)
 .har-profile/
+
+# local bug reports / screenshots (not source)
+Bugs/
