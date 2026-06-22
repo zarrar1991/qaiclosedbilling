@@ -1,5 +1,5 @@
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { chromium, type Page } from "playwright";
 import type { AppConfig } from "./types.js";
 import {
@@ -10,7 +10,9 @@ import { addPaymentMethod, listPaymentMethods } from "./api/iclosed-app.js";
 
 const ZERO_FUNDS_CARD = "4000000000000341";
 const APP_CARD = "4000056655665556";
-const ARTIFACTS = "artifacts";
+// Set per-run to an absolute writable dir (relative "artifacts" → ENOENT in a
+// packaged app where cwd isn't writable). See launchStripeContext / runZeroFundsFlow.
+let ARTIFACTS = "artifacts";
 
 export interface ZeroFundsHooks {
   onStatus?: (step: string, message: string) => void;
@@ -166,6 +168,7 @@ export async function runZeroFundsFlow(
 ): Promise<ZeroFundsFlowResult> {
   const status = (s: string, m: string) => hooks.onStatus?.(s, m);
   const notes: string[] = [];
+  ARTIFACTS = join(dirname(cfg.stripe.authProfileDir), "artifacts"); // writable when packaged
   const context = await launchStripeContext(cfg);
   const page = context.pages()[0] ?? (await context.newPage());
   try {

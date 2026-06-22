@@ -2,7 +2,7 @@
 // which electron-builder strips from packaged builds — ERR_MODULE_NOT_FOUND at launch).
 import { chromium, type BrowserContext, type Page, type Locator } from "playwright";
 import { mkdirSync } from "node:fs";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import type { AppConfig, ParsedSpan } from "./types.js";
 import { addSpan } from "./time.js";
 import { promptEnterWhenReady } from "./prompts.js";
@@ -31,7 +31,10 @@ export interface StripeFlowHooks {
   confirmAdvance?: (details: { targetIso: string }) => Promise<boolean>;
 }
 
-const ARTIFACTS = "artifacts";
+// Set at launch to an absolute, writable dir (next to the auth profile). A bare
+// relative "artifacts" resolves against process.cwd(), which is NOT writable in a
+// packaged app (cwd = "/" on macOS) → "ENOENT: mkdir 'artifacts'".
+let ARTIFACTS = "artifacts";
 
 async function shot(page: Page, name: string): Promise<void> {
   const dir = join(ARTIFACTS, "screenshots");
@@ -46,8 +49,11 @@ function parseHumanDate(s: string): Date | null {
 }
 
 export async function launchStripeContext(cfg: AppConfig): Promise<BrowserContext> {
+  // authProfileDir is made absolute (userData) by the Electron main process; put
+  // artifacts beside it so both land in a writable location when packaged.
+  ARTIFACTS = join(dirname(cfg.stripe.authProfileDir), "artifacts");
   mkdirSync(cfg.stripe.authProfileDir, { recursive: true });
-  mkdirSync(ARTIFACTS, { recursive: true });
+  try { mkdirSync(ARTIFACTS, { recursive: true }); } catch { /* artifacts (screenshots/traces) are non-essential */ }
   const context = await chromium.launchPersistentContext(cfg.stripe.authProfileDir, {
     headless: false,
     slowMo: cfg.slowMoMs,
