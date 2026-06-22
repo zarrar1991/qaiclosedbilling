@@ -11,6 +11,8 @@ const STRIPE_KEYS = ["STRIPE_DASHBOARD_URL", "STRIPE_ENVIRONMENT_NAME", "STRIPE_
   "STRIPE_STEP_TIMEOUT_MS", "STRIPE_LONG_TIMEOUT_MS", "DEFAULT_RENEWAL_OFFSET_MINUTES", "PLAYWRIGHT_SLOW_MO_MS"];
 const BO_KEYS = ["BO_BASE_URL", "BO_EMAIL", "BO_PASSWORD"];
 const APP_KEYS = ["ICLOSED_APP_URL"];
+// Never written to / read from an export file (secrets stay on the machine).
+const EXPORT_EXCLUDE = ["PGUSER", "PGPASSWORD", "BO_PASSWORD"];
 
 export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void }) {
   const toast = useToast();
@@ -59,6 +61,29 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
     const r = await api.testDb(vals);
     if (r.ok) toast("success", "Connection OK", "Connected using the current field values.");
     else toast("error", "Connection failed", humanizeError(r.error));
+  }
+
+  async function exportSettings() {
+    const filtered: Record<string, string> = {};
+    for (const [k, v] of Object.entries(vals)) if (!EXPORT_EXCLUDE.includes(k)) filtered[k] = v;
+    const r = await api.exportSettings(filtered);
+    if (!r.ok) { toast("error", "Export failed", humanizeError(r.error)); return; }
+    if (r.data.saved) toast("success", "Settings exported", "Saved (PGUSER, PGPASSWORD, BO_PASSWORD excluded).");
+  }
+
+  async function importSettings() {
+    if (!selected) { toast("error", "Select a profile", "Select a profile to import into first."); return; }
+    const r = await api.importSettings();
+    if (!r.ok) { toast("error", "Import failed", humanizeError(r.error)); return; }
+    if (!r.data.values) return; // user canceled the dialog
+    const incoming: Record<string, string> = {};
+    for (const [k, v] of Object.entries(r.data.values)) if (!EXPORT_EXCLUDE.includes(k)) incoming[k] = v;
+    const merged = { ...vals, ...incoming }; // keep current PGUSER/PGPASSWORD/BO_PASSWORD
+    const sr = await api.saveProfile(selected, merged);
+    if (!sr.ok) { toast("error", "Import failed", humanizeError(sr.error)); return; }
+    setVals(merged); setNames(sr.data.names); setActive(sr.data.activeProfile); onProfilesChanged?.();
+    const n = Object.keys(incoming).length;
+    toast("success", "Settings imported", `Applied ${n} field${n === 1 ? "" : "s"} to "${selected}" and saved (secrets kept).`);
   }
 
   async function createProfile(values: Record<string, string>, successText: (name: string) => string) {
@@ -165,9 +190,11 @@ export function Settings({ onProfilesChanged }: { onProfilesChanged?: () => void
       {section("Back Office API", BO_KEYS, "BO_PASSWORD")}
       {section("Application", APP_KEYS)}
 
-      <div className="mt-[22px] flex gap-2.5 border-t border-[#EEF0F3] pt-[18px]">
+      <div className="mt-[22px] flex flex-wrap items-center gap-2.5 border-t border-[#EEF0F3] pt-[18px]">
         <button onClick={save} disabled={!selected} className="ic-btn-primary px-5 py-2 text-[13px]">Save</button>
         <button onClick={test} disabled={!selected} className="ic-btn-secondary px-[18px] py-[7px] text-[13px]">Test DB connection</button>
+        <button onClick={exportSettings} disabled={!selected} title="Export settings to a JSON file (excludes PGUSER, PGPASSWORD, BO_PASSWORD)" className="ic-btn-secondary ml-auto px-4 py-[7px] text-[13px]">Export</button>
+        <button onClick={importSettings} disabled={!selected} title="Import settings from a JSON file (PGUSER, PGPASSWORD, BO_PASSWORD are kept)" className="ic-btn-secondary px-4 py-[7px] text-[13px]">Import</button>
       </div>
 
       <ConfirmDialog

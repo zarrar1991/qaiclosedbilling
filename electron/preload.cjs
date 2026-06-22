@@ -11,6 +11,8 @@ const CH = {
   profilesDelete: "profiles:delete",
   profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",
+  settingsExport: "settings:export",
+  settingsImport: "settings:import",
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",
   campaignsList: "campaigns:list",
@@ -38,6 +40,8 @@ contextBridge.exposeInMainWorld("api", {
   setActiveProfile: (name) => ipcRenderer.invoke(CH.profilesSetActive, name),
   // Operations (each takes the selected profile name)
   testDb: (values) => ipcRenderer.invoke(CH.settingsTestDb, values),
+  exportSettings: (values) => ipcRenderer.invoke(CH.settingsExport, values),
+  importSettings: () => ipcRenderer.invoke(CH.settingsImport),
   getCandidates: (profile, email) => ipcRenderer.invoke(CH.renewalGetCandidates, { profile, email }),
   searchSubscriptions: (profile, email) => ipcRenderer.invoke(CH.subscriptionsSearch, { profile, email }),
   listCampaigns: (profile) => ipcRenderer.invoke(CH.campaignsList, profile),

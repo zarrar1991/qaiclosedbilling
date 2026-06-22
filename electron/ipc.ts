@@ -59,6 +59,8 @@ export const CH = {
   profilesDelete: "profiles:delete",
   profilesSetActive: "profiles:setActive",
   settingsTestDb: "settings:testDb",
+  settingsExport: "settings:export",
+  settingsImport: "settings:import",
   renewalGetCandidates: "renewal:getCandidates",
   subscriptionsSearch: "subscriptions:search",
   campaignsList: "campaigns:list",

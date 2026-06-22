@@ -1,6 +1,6 @@
-import { app, BrowserWindow, ipcMain, shell } from "electron";
+import { app, BrowserWindow, ipcMain, shell, dialog } from "electron";
 import { join, dirname } from "node:path";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 import https from "node:https";
@@ -218,6 +218,47 @@ ipcMain.handle(CH.settingsTestDb, (_e, values: Record<string, string>) =>
     });
     try { await pool.query("SELECT 1"); return { connected: true }; }
     finally { await pool.end().catch(() => undefined); }
+  }),
+);
+
+// Export settings: write the renderer-filtered values (secrets already omitted) to
+// a JSON file the user picks.
+ipcMain.handle(CH.settingsExport, (e, values: Record<string, string>) =>
+  wrap(async () => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const { canceled, filePath } = await dialog.showSaveDialog(win ?? undefined!, {
+      title: "Export settings",
+      defaultPath: "iclosed-billing-settings.json",
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (canceled || !filePath) return { saved: false };
+    writeFileSync(filePath, JSON.stringify(values, null, 2), "utf8");
+    return { saved: true, path: filePath };
+  }),
+);
+
+// Import settings: read a JSON file the user picks; return its values (string map)
+// to the renderer, which filters secrets and saves.
+ipcMain.handle(CH.settingsImport, (e) =>
+  wrap(async () => {
+    const win = BrowserWindow.fromWebContents(e.sender);
+    const { canceled, filePaths } = await dialog.showOpenDialog(win ?? undefined!, {
+      title: "Import settings",
+      properties: ["openFile"],
+      filters: [{ name: "JSON", extensions: ["json"] }],
+    });
+    if (canceled || !filePaths[0]) return { values: null as Record<string, string> | null };
+    let parsed: unknown;
+    try { parsed = JSON.parse(readFileSync(filePaths[0], "utf8")); }
+    catch { throw new Error("That file isn't valid JSON."); }
+    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) {
+      throw new Error("That file isn't a settings export.");
+    }
+    const values: Record<string, string> = {};
+    for (const [k, v] of Object.entries(parsed as Record<string, unknown>)) {
+      if (v != null && typeof v !== "object") values[k] = String(v);
+    }
+    return { values };
   }),
 );
 ipcMain.handle(CH.renewalGetCandidates, (_e, p: { profile: string; email: string }) =>
