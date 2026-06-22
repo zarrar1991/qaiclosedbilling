@@ -28,6 +28,14 @@ export function Renewal({ profile }: { profile: string }) {
     setSearchRows(res.data.rows);
   }
 
+  // Search button: a fresh search should drop the previous Update outcome (and
+  // any pending picker). The internal refresh in doUpdate keeps calling runSearch
+  // directly so it preserves the just-set success message.
+  function onSearchClick() {
+    setResult(null); setRows(null);
+    void runSearch();
+  }
+
   async function start() {
     setResult(null); setRows(null); setBusy(true);
     const res = await api.getCandidates(profile, email);
@@ -63,7 +71,7 @@ export function Renewal({ profile }: { profile: string }) {
         <button disabled={disabled} onClick={start} className="ic-btn-primary px-[18px] py-2 text-[13px]">
           {busy ? "Working…" : "Update"}
         </button>
-        <button disabled={disabled} onClick={runSearch} className="ic-btn-secondary px-[17px] py-[7px] text-[13px]">
+        <button disabled={disabled} onClick={onSearchClick} className="ic-btn-secondary px-[17px] py-[7px] text-[13px]">
           {searching ? "Searching…" : "Search"}
         </button>
         <button title="Refresh results" aria-label="Refresh results" disabled={disabled} onClick={runSearch}
