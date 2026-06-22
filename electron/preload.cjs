@@ -31,6 +31,7 @@ const CH = {
 };
 
 contextBridge.exposeInMainWorld("api", {
+  platform: process.platform,
   // Profiles
   loadProfiles: () => ipcRenderer.invoke(CH.profilesList),
   getProfile: (name) => ipcRenderer.invoke(CH.profilesGet, name),

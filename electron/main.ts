@@ -136,9 +136,13 @@ function createWindow(): void {
   // In dev, show the branded icon on the taskbar (packaged builds use the
   // executable's own icon, set by electron-builder from build/icon.png).
   const devIcon = join(process.cwd(), "build", "icon.png");
+  const isMac = process.platform === "darwin";
   const win = new BrowserWindow({
     width: 1440, height: 900, minWidth: 960, minHeight: 600, backgroundColor: "#F8FAFC",
-    frame: false, // frameless: the renderer draws its own title bar (see ui/components/TitleBar.tsx)
+    // macOS: hide the title bar but keep the native traffic-light controls (the
+    // green button gives proper zoom/maximize). Windows/Linux: fully frameless —
+    // the renderer draws its own controls (see ui/components/TitleBar.tsx).
+    ...(isMac ? { titleBarStyle: "hidden" as const, trafficLightPosition: { x: 12, y: 12 } } : { frame: false }),
     ...(app.isPackaged ? {} : existsSync(devIcon) ? { icon: devIcon } : {}),
     webPreferences: { preload: join(__dirname, "preload.cjs"), contextIsolation: true, nodeIntegration: false },
   });

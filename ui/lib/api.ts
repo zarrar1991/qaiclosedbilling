@@ -2,6 +2,7 @@ import type { IpcResult, RenewalCandidates, RenewalUpdateRequest, RenewalUpdateR
 import type { RunReport, Campaign, CampaignLink } from "../../src/types.js";
 
 interface Api {
+  platform: string; // process.platform, e.g. "darwin" | "win32"
   // Profiles
   loadProfiles(): Promise<IpcResult<ProfilesList>>;
   getProfile(name: string): Promise<IpcResult<Record<string, string>>>;
