@@ -142,19 +142,27 @@ async function fillSignupForm(page, email, password) {
   await page.getByRole('button', { name: 'Continue' }).click();
 }
 
-async function fillStripeCheckout(page, username) {
-  const frame = page.frameLocator('iframe[name="embedded-checkout"]');
+async function fillStripeCheckout(page, email) {
+  // The checkout is now an iClosed-native page (/app/checkout) with a Stripe
+  // Payment Element iframe — NOT the old Stripe embedded-checkout. Fewer fields:
+  // no Company Name / Cardholder name; email is prefilled. Card number / expiry
+  // (combined MM/YY) / cvc live in the Payment Element iframe; the submit button
+  // ("Start trial" or "Subscribe") is on the page itself.
+  const emailInput = page.locator('#checkout-email');
+  if (await emailInput.isVisible().catch(() => false)) {
+    if (!(await emailInput.inputValue().catch(() => ''))) await emailInput.fill(email);
+  }
 
-  await frame.getByRole('textbox', { name: 'Company Name' }).waitFor({ timeout: DEFAULT_TIMEOUT });
-  await frame.getByRole('textbox', { name: 'Company Name' }).fill(username);
-  await frame.getByRole('textbox', { name: 'Card number' }).fill('4242424242424242');
-  await frame.getByRole('textbox', { name: 'Expiration' }).fill(randomFutureExpiry());
-  await frame.getByRole('textbox', { name: 'CVC' }).fill(randomCvc());
-  await frame.getByRole('textbox', { name: 'Cardholder name' }).fill(username);
+  const card = page.frameLocator('iframe[src*="elements-inner-payment"]');
+  await card.locator('[name="number"]').waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT });
+  await card.locator('[name="number"]').fill('4242424242424242');
+  await card.locator('[name="expiry"]').fill(randomFutureExpiry());
+  await card.locator('[name="cvc"]').fill(randomCvc());
 
-  // Submit by stable test id — works for both "Start trial" and the no-trial label
-  // (e.g. "Subscribe" / "Pay") because Stripe keeps the same data-testid.
-  await frame.getByTestId('hosted-payment-submit-button').click();
+  // Submit: "Start trial" (trial plans) or "Subscribe" (no-trial). On the page.
+  const submit = page.getByRole('button', { name: /start trial|subscribe/i }).first();
+  await submit.waitFor({ state: 'visible', timeout: DEFAULT_TIMEOUT });
+  await submit.click();
 }
 
 async function fillWelcomeScreen(page, username, onProgress) {
@@ -406,13 +414,19 @@ async function createIClosedUser(opts) {
     await page.waitForURL('**/checkout**', { timeout: DEFAULT_TIMEOUT });
 
     log(onProgress, 'Filling Stripe checkout');
-    await fillStripeCheckout(page, username);
+    await fillStripeCheckout(page, email);
 
     log(onProgress, 'Waiting for payment to succeed');
-    await page.waitForURL('**/checkout-success**', { timeout: PAYMENT_TIMEOUT });
-
-    log(onProgress, 'Clicking Go to iClosed');
-    await page.getByRole('button', { name: 'Go to iClosed' }).click();
+    // After submit the flow either shows a success page with "Go to iClosed" or
+    // goes straight to the welcome/questionnaire. Wait for whichever appears
+    // (condition-based, so a renamed success URL doesn't break us).
+    const goBtn = page.getByRole('button', { name: /go to iclosed/i });
+    const welcomeUser = page.getByRole('textbox', { name: /username/i });
+    await goBtn.or(welcomeUser).first().waitFor({ state: 'visible', timeout: PAYMENT_TIMEOUT });
+    if (await goBtn.isVisible().catch(() => false)) {
+      log(onProgress, 'Clicking Go to iClosed');
+      await goBtn.click();
+    }
 
     log(onProgress, 'Filling Welcome to iClosed screen', { detail: username });
     await fillWelcomeScreen(page, username, onProgress);
