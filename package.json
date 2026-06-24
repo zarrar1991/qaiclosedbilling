@@ -46,7 +46,7 @@
       "!release/**",
       "!iclosed-module.zip",
       "!.iclosed-module-extract/**",
-      "!run.bat",
+      "!*.bat",
       "!*.command",
       "!README.md",
       "!package-lock.json",

@@ -56,6 +56,7 @@ npm start            # or double-click run.bat on Windows
 ```
 # Windows (.exe) — on Windows:
 npm run app:build:win        # → release/iClosed Billing Setup 1.0.0.exe
+#   or double-click build-windows.bat (one-click: install → playwright → build)
 
 # macOS (.dmg) — on a Mac:
 npm run app:build:mac        # → release/iClosed Billing-1.0.0.dmg
